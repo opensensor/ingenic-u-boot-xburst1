@@ -9,6 +9,20 @@ else
 fi
 
 OUTPUT_DIR="./uboot_build"
+JOBS=$(nproc)
+
+while [ "$1" != "" ]; do
+	case $1 in
+		-single)
+			JOBS=1
+			shift
+			;;
+		*)
+			soc=$1
+			shift
+			;;
+	esac
+done
 
 if command -v resize; then
 	eval $(resize)
@@ -67,7 +81,7 @@ build_version() {
 
 	make distclean
 	mkdir -p "${OUTPUT_DIR}" >/dev/null
-	make CROSS_COMPILE="$CROSS_COMPILE" $soc -j$(nproc) HOSTCC="$HOSTCC"
+	make CROSS_COMPILE="$CROSS_COMPILE" $soc -j${JOBS} HOSTCC="$HOSTCC"
 	if [ -f u-boot-lzo-with-spl.bin ]; then
 		echo "u-boot-lzo-with-spl.bin exists, copying..."
 		cp u-boot-lzo-with-spl.bin "${OUTPUT_DIR}/u-boot-${soc}.bin"
@@ -77,7 +91,6 @@ build_version() {
 	fi
 }
 
-soc="$1"
 [ -z "$soc" ] && pick_a_soc
 [ -z "$soc" ] && echo No SoC && exit 1
 build_version "$soc"
