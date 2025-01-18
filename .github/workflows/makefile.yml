@@ -232,7 +232,7 @@ jobs:
           export PATH="/usr/lib/ccache:$PATH"
           export PATH="/github/home/mipsel-thingino-linux-musl_sdk-buildroot/bin:$PATH"
           ccache -M 4G
-          CROSS_COMPILE="ccache mipsel-linux-" bash build.sh ${{ matrix.u-boot-version }}
+          CROSS_COMPILE="ccache mipsel-linux-" bash build.sh -single ${{ matrix.u-boot-version }}
           TIME=$(date -d @${SECONDS} +%M:%S)
           echo "TIME=${TIME}" >> ${GITHUB_ENV}
 
