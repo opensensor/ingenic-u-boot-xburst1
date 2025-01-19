@@ -79,7 +79,7 @@ build_version() {
 	local soc=$1
 	echo "Building U-Boot for ${soc}"
 
-	make distclean
+	make CROSS_COMPILE="$CROSS_COMPILE" distclean
 	mkdir -p "${OUTPUT_DIR}" >/dev/null
 	make CROSS_COMPILE="$CROSS_COMPILE" $soc -j${JOBS} HOSTCC="$HOSTCC"
 	if [ -f u-boot-lzo-with-spl.bin ]; then
