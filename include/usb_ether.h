@@ -50,6 +50,13 @@ int asix_eth_probe(struct usb_device *dev, unsigned int ifnum,
 int asix_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
 		      struct eth_device *eth);
 #endif
+#ifdef CONFIG_USB_ETHER_ASIX88179
+void ax88179_eth_before_probe(void);
+int ax88179_eth_probe(struct usb_device *dev, unsigned int ifnum,
+		      struct ueth_data *ss);
+int ax88179_eth_get_info(struct usb_device *dev, struct ueth_data *ss,
+		      struct eth_device *eth);
+#endif
 
 #ifdef CONFIG_USB_ETHER_SMSC95XX
 void smsc95xx_eth_before_probe(void);
