@@ -1,4 +1,3 @@
-#define DEBUG
 /*
  * Copyright (c) 2014 Rene Griessl <rgriessl@cit-ec.uni-bielefeld.de>
  * based on the U-Boot Asix driver as well as information
