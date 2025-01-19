@@ -12,6 +12,9 @@ COBJS-$(CONFIG_USB_HOST_ETHER) += usb_ether.o
 ifdef CONFIG_USB_ETHER_ASIX
 COBJS-y += asix.o
 endif
+ifdef CONFIG_USB_ETHER_ASIX88179
+COBJS-y += asix88179.o
+endif
 COBJS-$(CONFIG_USB_ETHER_SMSC95XX) += smsc95xx.o
 
 COBJS	:= $(COBJS-y)
