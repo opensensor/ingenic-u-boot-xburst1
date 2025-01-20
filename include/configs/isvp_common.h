@@ -625,7 +625,12 @@
 
 #define CONFIG_SKIP_LOWLEVEL_INIT
 
+#if defined(CONFIG_JZ_UART_INDEX_0)
+#define CONFIG_SYS_UART_INDEX		0
+#else
 #define CONFIG_SYS_UART_INDEX		1
+#endif
+
 #define CONFIG_BAUDRATE			115200
 #if defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
 #define CONFIG_SYS_UART_CONTROLLER_STEP	0x1000
