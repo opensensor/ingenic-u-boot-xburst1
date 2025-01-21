@@ -563,14 +563,13 @@ extern void board_usb_init(void);
 		}
 	}
 
-	/* Check if disable_sd is "false" AND either network initialization was not attempted
-	due to disable_eth being "true" OR it failed. */
-	if (disable_sd != NULL && strcmp(disable_sd, "false") == 0 &&
-		(!networkInitializationAttempted || ret < 0)) {
-		/* MMC specific user GPIO set */
-		handle_gpio_settings("gpio_mmc_power");
-	}
 #endif
+
+/* Check if disable_sd is "false". */
+if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
+	/* MMC specific user GPIO set */
+	handle_gpio_settings("gpio_mmc_power");
+}
 
 /* IRCUT GPIO set */
 handle_gpio_settings("gpio_ircut");
