@@ -1321,8 +1321,9 @@ s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
 		if (status)
 			return status;
 
-#if (CONFIG_NET_PHY_TYPE == PHY_TYPE_DM9161) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_8710A) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G)
+#if (CONFIG_NET_PHY_TYPE == PHY_TYPE_DM9161) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_8710A) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G) && (!defined(CONFIG_PHY_JL1101))
 		/* RTL8201F */
+		debug("ETH:   PHY: RTL8201F 0x1c-0xc816\n");
 		if ((0x1c == id1) && (0xc816 == id2)) {
 			if((data & 1) == 0){
 				TR("No Link\n");
@@ -1384,8 +1385,9 @@ s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
 
 		}
 
-#elif (CONFIG_NET_PHY_TYPE == PHY_TYPE_DM9161) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_8710A) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G)
-		/* RTL8201F */
+#elif ((CONFIG_NET_PHY_TYPE == PHY_TYPE_DM9161) || (CONFIG_NET_PHY_TYPE == PHY_TYPE_8710A) || ((CONFIG_NET_PHY_TYPE == PHY_TYPE_IP101G) && defined(CONFIG_PHY_JL1101)))
+		/* RTL8201F / JL1101 */
+		debug("ETH:   PHY: JL1101\n");
 		if ((data & 1) == 0) {
 			TR("No Link\n");
 			gmacdev->LinkState = LINKDOWN;
