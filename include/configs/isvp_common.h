@@ -672,7 +672,7 @@
 #define CONFIG_CMD_GETTIME
 #define CONFIG_CMD_GPIO
 #if !defined(CONFIG_T31LC) && !defined(CONFIG_XIAOMI_SPL)
-#define CONFIG_CMD_JFFS2
+/*#define CONFIG_CMD_JFFS2*/
 #endif
 #define CONFIG_CMD_LOADB
 #define CONFIG_CMD_MEMORY
@@ -696,6 +696,9 @@
 #define CONFIG_CMD_TFTPSRV
 #endif
 #define CONFIG_CMD_WATCHDOG
+#define CONFIG_CMD_UBI
+#define CONFIG_CMD_UBIFS
+#define CONFIG_CMD_MTDPARTS
 
 /* JFFS2 configuration */
 #if defined(CONFIG_CMD_JFFS2)
