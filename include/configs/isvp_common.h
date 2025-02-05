@@ -729,11 +729,6 @@
 #endif
 
 /**
- * Serial download configuration
- */
-#define CONFIG_LOADS_ECHO		1	/* echo on for serial download */
-
-/**
  * Miscellaneous configurable options
  */
 #define CONFIG_DOS_PARTITION
