@@ -523,6 +523,9 @@ extern void board_usb_init(void);
 
 	/* Platform Default GPIO Set */
 	handle_gpio_settings("gpio_default");
+
+	/* Platform USB Power */
+	handle_gpio_settings("gpio_usb_en");
 #endif
 
 #ifdef CONFIG_BITBANGMII
