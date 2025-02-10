@@ -6,7 +6,7 @@
 
 extern struct spi_flash *get_flash(void);
 
-#define SEARCH_SECTOR_SIZE          0x1000
+#define SEARCH_SECTOR_SIZE          0x10000  // 64KB
 #define KERNEL_MAGIC_NUMBER         0x56190527
 #define KERNEL_MAGIC_OFFSET         0
 #define SQUASHFS_BYTES_USED_OFFSET  40
