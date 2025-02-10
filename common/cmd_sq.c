@@ -67,7 +67,7 @@ static uint64_t find_squashfs_start(struct spi_flash *flash, uint64_t start_sear
 
 // Function to update kernel environment variables
 static int update_kernel_env(struct spi_flash *flash, uint64_t *kernel_start_addr, uint64_t *squashfs_start_addr) {
-	uint64_t k_start = find_kernel_start(flash, 0x40000, 0x90000);
+	uint64_t k_start = find_kernel_start(flash, 0x40000, 0xB0000);
 	if (k_start == 0) {
 		printf("SQ:    Kernel not found in specified range.\n");
 		return -1; // Indicate failure
