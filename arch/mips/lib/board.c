@@ -374,9 +374,9 @@ extern void board_usb_init(void);
 		printf("JZNET:   init failed\n");
 	}
 
-	/*if (run_command("factory reset", 0) != 0) {
+	if (run_command("factory reset", 0) != 0) {
 		printf("FACTORY:   reset failed\n");
-	}*/
+	}
 
 	/* Try to get the value of the 'disable_sd' environment variable */
 	char* disable_sd = getenv("disable_sd");
