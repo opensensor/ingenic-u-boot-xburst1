@@ -374,7 +374,7 @@ extern void board_usb_init(void);
 		printf("JZNET:   init failed\n");
 	}
 
-	if (run_command("factory reset", 0) == 0) {
+	if (run_command("factory reset-boot", 0) == 0) {
 		printf("RST:   reset successful, resetting system...\n");
 		run_command("reset", 0);
 	}
