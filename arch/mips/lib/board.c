@@ -375,7 +375,10 @@ extern void board_usb_init(void);
 	}
 
 	if (run_command("factory reset", 0) != 0) {
-		printf("FACTORY:   reset failed\n");
+		printf("RST:   reset failed\n");
+	} else {
+		printf("RST:   reset successful, resetting system...\n");
+		run_command("reset", 0);
 	}
 
 	/* Try to get the value of the 'disable_sd' environment variable */
