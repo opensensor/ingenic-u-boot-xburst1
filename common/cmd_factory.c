@@ -126,19 +126,19 @@ static int factory_reset_internal(int force)
 			unsigned gpio_number = (unsigned)simple_strtoul(gpio_button_str, NULL, 10);
 			handle_gpio_settings("gpio_button");
 			int value = gpio_get_value(gpio_number); /* Get the GPIO value */
-			debug("KEY:   GPIO %u value: %d\n", gpio_number, value);
+			debug("RST:   GPIO %u value: %d\n", gpio_number, value);
 			if (value != 0) {
-				printf("KEY:   Reset button not pressed; skipping factory reset.\n");
+				printf("RST:   Reset button not pressed; skipping factory reset.\n");
 				return CMD_RET_FAILURE;
 			}
 		} else {
-			printf("KEY:   Reset button undefined; skipping factory reset.\n");
+			printf("RST:   Reset button undefined; skipping factory reset.\n");
 			return CMD_RET_FAILURE;
 		}
 	}
 
 	/* Proceed with reset operations (either forced or button checked) */
-	printf("KEY:   Factory reset initiated%s.\n", force ? " (forced)" : "");
+	printf("RST:   Factory reset initiated%s.\n", force ? " (forced)" : "");
 
 	if (run_command("env default -f -a", 0) != 0) {
 		printf("RST:   Error: Failed to reset ENV defaults.\n");
