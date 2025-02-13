@@ -501,6 +501,17 @@ static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[
 	if (strcmp(cmd, "probe") == 0) {
 		ret = do_spi_flash_probe(argc, argv);
 		goto done;
+	} else if (strcmp(cmd, "probe-alt") == 0) {
+		ret = do_spi_flash_probe(argc, argv);
+		/* Grab flash chip size and save it */
+		char flashlen_str[32], flashsize_str[32];
+		int64_t flashsize = flash->size;
+		sprintf(flashlen_str, "%llx", flashsize);
+		setenv("flash_len", flashlen_str);
+		sprintf(flashsize_str, "%lluk", flashsize / 1024);
+		setenv("flash_size", flashsize_str);
+		printf("SF:    flash_size env set to %s\n", flashsize_str);
+		goto done;
 	}
 
 	/* The remaining commands require a selected device */
@@ -545,6 +556,8 @@ U_BOOT_CMD(
 	"SPI flash sub-system",
 	"probe [[bus:]cs] [hz] [mode]	- init flash device on given SPI bus\n"
 	"				  and chip select\n"
+	"probe-alt [[bus:]cs] [hz] [mode]	- init flash device on given SPI bus\n"
+	"				  and chip select.  Save flash param to env.\n"
 	"sf read addr offset len 	- read `len' bytes starting at\n"
 	"				  `offset' to memory at `addr'\n"
 	"sf write addr offset len	- write `len' bytes from memory\n"
