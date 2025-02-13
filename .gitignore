@@ -1,4 +1,5 @@
 uboot_build/
+.idea
 .vscode
 *boards.depend
 System.map
