@@ -190,6 +190,8 @@ int process_spi_flash_data(struct spi_flash *flash) {
 	return 0;  // Success
 }
 
+/* env functions which do not use the flash api */
+
 #define KERNEL_FLASH_OFFSET 0x50000
 #define KERNEL_READ_SIZE    0x100000
 #define ROOTFS_READ_SIZE    0x100000
@@ -207,7 +209,7 @@ static int search_for_magic(const char *buf, size_t size, uint32_t magic)
 }
 
 //find kernel start addr and save startaddr to ENV
-uint32_t update_kernel_address_noapi(void)
+uint32_t update_kernel_address_nor_noapi(void)
 {
 	int ret;
 	char read_cmd[128];
@@ -255,7 +257,7 @@ uint32_t update_kernel_address_noapi(void)
 	return kernel_flash_addr;
 }
 
-uint32_t update_rootfs_address_noapi(void)
+uint32_t update_rootfs_address_nor_noapi(void)
 {
 	int ret;
 	char read_cmd[128];
@@ -312,7 +314,7 @@ uint32_t update_rootfs_address_noapi(void)
 	return rootfs_flash_addr;
 }
 
-uint64_t compute_rootfs_partition_size(void)
+uint64_t compute_rootfs_partition_size_nor_noapi(void)
 {
 	int ret;
 	const char *read_cmd = "sf read ${baseaddr} ${rootfs_addr} 64";
@@ -394,7 +396,7 @@ static void compute_kernel_partition_size(void)
 	printf("SQ:    Computed kernel partition size (decimal): %s\n", buf_dec);
 }
 
-static void update_mtdparts_env_noapi(void)
+static void update_mtdparts_env_nor_noapi(void)
 {
 	const char *flash_len_str = getenv("flash_len");
 	if (!flash_len_str) {
@@ -451,11 +453,11 @@ static int do_sq(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			printf("SQ:    SquashFS processing failed.\n");
 		}
 	} else if (strcmp(argv[1], "probe-alt") == 0) {
-		update_kernel_address_noapi();
-		update_rootfs_address_noapi();
-		compute_rootfs_partition_size();
+		update_kernel_address_nor_noapi();
+		update_rootfs_address_nor_noapi();
+		compute_rootfs_partition_size_nor_noapi();
 		compute_kernel_partition_size();
-		update_mtdparts_env_noapi();
+		update_mtdparts_env_nor_noapi();
 	}
 
 	return CMD_RET_SUCCESS;
