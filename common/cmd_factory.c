@@ -3,6 +3,109 @@
 
 #define ALIGNMENT_BLOCK_SIZE        0x10000  // 64KB
 
+static int erase_config_partition_from_mtdparts(void)
+{
+    const char *mtdparts = getenv("mtdparts");
+    if (!mtdparts) {
+        printf("RST:   Error: mtdparts not set in environment.\n");
+        return CMD_RET_FAILURE;
+    }
+
+    /* mtdparts value (usually will include a "setenv mtdparts" prefix):
+     * "setenv mtdparts mtdparts=jz_sfc:256k(boot),64k(env),192k(config),${kern_size_dec}(kernel),${rootfs_size}(rootfs),-(rootfs_data)${update}"
+     *
+     * We first locate the substring "mtdparts=".
+     */
+    const char *parts_str = strstr(mtdparts, "mtdparts=");
+    if (!parts_str) {
+        printf("RST:   Error: mtdparts format invalid.\n");
+        return CMD_RET_FAILURE;
+    }
+    parts_str += strlen("mtdparts=");
+
+    /* Skip the device name: find the colon */
+    const char *p = strchr(parts_str, ':');
+    if (!p) {
+        printf("RST:   Error: mtdparts missing colon separator.\n");
+        return CMD_RET_FAILURE;
+    }
+    p++; // p now points to the partition list
+
+    /*
+     * Tokenize the partition list by commas.
+     * We expect tokens in order:
+     *    Token 1: "256k(boot)"
+     *    Token 2: "64k(env)"
+     *    Token 3: "<size>k(config)"
+     */
+
+    char partition[64];
+    int token = 0;
+    const char *cursor = p;
+    const char *token_start = cursor;
+    const char *token_end;
+    unsigned long part_sizes[3] = {0, 0, 0};
+
+    while ((token_end = strchr(cursor, ',')) != NULL && token < 3) {
+        int len = token_end - token_start;
+        if (len >= sizeof(partition))
+            len = sizeof(partition) - 1;
+        memcpy(partition, token_start, len);
+        partition[len] = '\0';
+
+        /* Extract the numeric part (in kilobytes) from the token.
+         */
+        char num_buf[16];
+        int i = 0;
+        while (partition[i] && partition[i] >= '0' && partition[i] <= '9' && i < sizeof(num_buf)-1) {
+            num_buf[i] = partition[i];
+            i++;
+        }
+        num_buf[i] = '\0';
+        if (i == 0) {
+            printf("RST:   Error: Unable to parse partition size from token: %s\n", partition);
+            return CMD_RET_FAILURE;
+        }
+        part_sizes[token] = simple_strtoul(num_buf, NULL, 10) * 1024; /* convert kilobytes to bytes */
+        token++;
+        cursor = token_end + 1;
+        token_start = cursor;
+    }
+
+    /* We must have at least three tokens for boot, env, and config. */
+    if (token < 3) {
+        printf("RST:   Error: mtdparts does not contain at least three partitions.\n");
+        return CMD_RET_FAILURE;
+    }
+
+    /* Compute config partition start address:
+     * config_start = boot_size + env_size.
+     */
+    unsigned long config_start = part_sizes[0] + part_sizes[1];
+    unsigned long config_size = part_sizes[2];  /* Third token is config size */
+
+    /* For debugging, print parsed values: */
+    printf("RST:   Boot size: 0x%lX, Env size: 0x%lX, Config size: 0x%lX\n",
+           part_sizes[0], part_sizes[1], config_size);
+    printf("RST:   Computed config partition start: 0x%lX\n", config_start);
+
+    /*
+	 * The command should be: "sf erase <start> <length>"
+     */
+    char cmd[64];
+    sprintf(cmd, "sf erase 0x%lX 0x%lX", config_start, config_size);
+    printf("RST:   Executing config partition erase command: %s\n", cmd);
+    if (run_command(cmd, 0) != 0) {
+        printf("RST:   Error: Failed to execute config partition erase command.\n");
+        return CMD_RET_FAILURE;
+    } else {
+        printf("RST:   Successfully erased config partition.\n");
+    }
+
+    return CMD_RET_SUCCESS;
+}
+
+
 /*
 * factory_reset_internal() - Perform factory reset operations.
 * @force: if nonzero, bypass the GPIO button check.
@@ -23,7 +126,7 @@ static int factory_reset_internal(int force)
 			unsigned gpio_number = (unsigned)simple_strtoul(gpio_button_str, NULL, 10);
 			handle_gpio_settings("gpio_button");
 			int value = gpio_get_value(gpio_number); /* Get the GPIO value */
-			debug("GPIO %u value: %d\n", gpio_number, value);
+			debug("KEY:   GPIO %u value: %d\n", gpio_number, value);
 			if (value != 0) {
 				printf("KEY:   Reset button not pressed; skipping factory reset.\n");
 				return CMD_RET_FAILURE;
@@ -56,6 +159,9 @@ static int factory_reset_internal(int force)
 		ret_status = CMD_RET_FAILURE;
 	}
 
+	/* Wipe the config partition */
+	erase_config_partition_from_mtdparts();
+
 	overlay_str = getenv("overlay");
 	flashsize_str = getenv("flash_len");
 	if (overlay_str && flashsize_str) {
@@ -77,7 +183,8 @@ static int factory_reset_internal(int force)
 			debug("RST:   Aligned Overlay: 0x%lX, Flash size: 0x%lX, Length to erase: 0x%lX\n",
 				aligned_overlay, flashsize, aligned_length);
 			sprintf(cmd, "sf erase 0x%lX 0x%lX", aligned_overlay, aligned_length);
-			debug("Executing command: %s\n", cmd);
+			debug("RST:   Executing command: %s\n", cmd);
+			printf("RST:   Erasing overlay...\n");
 			if (run_command(cmd, 0) != 0) {
 				printf("RST:   Error: Failed to execute erase command.\n");
 				ret_status = CMD_RET_FAILURE;
