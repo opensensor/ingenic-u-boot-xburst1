@@ -11,34 +11,21 @@
 #include <serial.h>
 #include <stdio_dev.h>
 #include <version.h>
-#include <net.h>
 #include <environment.h>
 #include <nand.h>
-#include <onenand_uboot.h>
 #include <spi.h>
 #include <spi_flash.h>
 #include <mmc.h>
 
-#ifdef CONFIG_BITBANGMII
-#include <miiphy.h>
-#endif
-
 #define BOOT_SCRIPT "fatload mmc 0 ${baseaddr} boot.scr"
 #define ENV_FILE "fatload mmc 0 ${baseaddr} uEnv.txt"
-
-#define SERIAL_NUM_ADDR1 0x13540200
-#define SERIAL_NUM_ADDR2 0x13540204
-#define SERIAL_NUM_ADDR3 0x13540208
-#define SERIAL_NUM_ADDR4 0x13540238 // T10/T20/T30
 
 extern int debug_socinfo;
 extern int do_socinfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 
 DECLARE_GLOBAL_DATA_PTR;
 ulong monitor_flash_len;
-uchar enetaddr[6];
 
-extern int jz_net_initialize(bd_t *bis);
 extern int autoupdate_status;
 
 void handle_gpio_settings(const char *env_var_name);
@@ -82,7 +69,6 @@ static int init_func_ram(void)
 
 static int display_banner(void)
 {
-
 	printf("\n\n%s\n\n", version_string);
 	return 0;
 }
@@ -99,75 +85,6 @@ static int init_baudrate(void)
 {
 	gd->baudrate = getenv_ulong("baudrate", 10, CONFIG_BAUDRATE);
 	return 0;
-}
-
-// Lets move this into another file, along with most of the other env setup gear...
-
-static void increment_mac_address(uint8_t *mac) {
-	int i; // Declare loop variable outside of the for loop
-	// Increment the last byte of the MAC address
-	// If it rolls over, increment the next byte, and so on
-	for (i = 5; i >= 0; i--) {
-		mac[i]++;
-		if (mac[i] != 0) {
-			break; // No rollover, so stop
-		}
-	}
-}
-
-static void generate_mac_from_serial(uint8_t *mac, uint32_t base1, uint32_t base2, uint32_t base3, uint32_t base4) {
-	// Use base4 if it is not all zeros, otherwise use a combination of other bases
-	if (base4 != 0) {
-		mac[0] = 0x02; // Locally administered and unicast
-		mac[1] = (base4 >> 24) & 0xFF;
-		mac[2] = (base4 >> 16) & 0xFF;
-		mac[3] = (base4 >> 8) & 0xFF;
-		mac[4] = base4 & 0xFF;
-	} else {
-		mac[0] = 0x02; // Locally administered and unicast
-		mac[1] = (base1 >> 24) & 0xFF;
-		mac[2] = (base1 >> 16) & 0xFF;
-		mac[3] = (base2 >> 24) & 0xFF;
-		mac[4] = (base2 >> 16) & 0xFF;
-	}
-	// Use a combination of serial parts for the last byte
-	mac[5] = ((base1 ^ base2 ^ base3 ^ base4) & 0xFF) | 0x01; // Ensure the last bit is 1 for unicast
-}
-
-static void generate_or_set_mac_address(const char *iface_name, const char *iface_type, bool increment) {
-	uint8_t addr[6];
-	uint32_t serial_part1 = readl(SERIAL_NUM_ADDR1);
-	uint32_t serial_part2 = readl(SERIAL_NUM_ADDR2);
-	uint32_t serial_part3 = readl(SERIAL_NUM_ADDR3);
-	uint32_t serial_part4 = readl(SERIAL_NUM_ADDR4 + 4);
-
-	if (!eth_getenv_enetaddr((char*)iface_name, addr)) {
-		// Check if all serial parts are zero
-		if (serial_part1 == 0 && serial_part2 == 0 && serial_part3 == 0 && serial_part4 == 0) {
-			// Generate a random MAC address
-			eth_random_enetaddr(addr);
-			printf("Net:   Random MAC address for %s generated\n", iface_type);
-		} else {
-			// Generate MAC from serial
-			generate_mac_from_serial(addr, serial_part1, serial_part2, serial_part3, serial_part4);
-			if (increment) {
-				increment_mac_address(addr); // For WLAN, make MAC +1 compared to ETH
-			}
-			printf("Net:   MAC address for %s based on device serial set\n", iface_type);
-		}
-
-		if (eth_setenv_enetaddr((char*)iface_name, addr)) {
-			printf("Net:   Failed to set address for %s\n", iface_type);
-		} else {
-			saveenv();
-		}
-	} else {
-		// A valid MAC address is already set
-		printf("Net:   HW address for %s: %02X:%02X:%02X:%02X:%02X:%02X\n",
-			iface_type,
-			addr[0], addr[1], addr[2],
-			addr[3], addr[4], addr[5]);
-	}
 }
 
 /*
@@ -405,12 +322,6 @@ void board_init_r(gd_t *id, ulong dest_addr)
 
 	/* At this point, Environment has been setup, now we can use it */
 
-#ifdef CONFIG_RANDOM_MACADDR
-	// Generate/set MAC Address
-	generate_or_set_mac_address("ethaddr", "ETH", false);
-	generate_or_set_mac_address("wlanmac", "WLAN", true);
-#endif
-
 #if defined(CONFIG_PCI)
 	/*
 	 * Do pci configuration
@@ -445,175 +356,76 @@ extern void board_usb_init(void);
 #if defined(CONFIG_MISC_INIT_R)
 	/* miscellaneous platform dependent initialisations */
 	misc_init_r();
-
-	/* Reset */
-	extern struct spi_flash *get_flash(void);
-
-	char *overlay_str, *flashsize_str;
-	unsigned long overlay, flashsize, length_to_erase, erase_block_size;
-	char cmd[64]; // Buffer for command
-
-	char* gpio_button_str = getenv("gpio_button");
-	if (gpio_button_str) {
-		unsigned gpio_number = (unsigned)simple_strtoul(gpio_button_str, NULL, 10);
-		handle_gpio_settings("gpio_button");
-		int value = gpio_get_value(gpio_number); // Get the GPIO value
-		debug("GPIO %u value: %d\n", gpio_number, value); // Print the value
-
-		if (value == 0) {
-			printf("KEY:   Reset button pressed during boot, erasing ENV and Overlay...\n");
-			run_command("env default -f -a", 0);
-			/* Carry over the gpio between resets if desired */
-			/* setenv("gpio_button", gpio_number); */
-			saveenv();
-
-			run_command("sf probe", 0); // Initialize SPI flash
-
-			// Probe SPI flash and get sector size
-			struct spi_flash *flash = get_flash();
-			if (!flash) {
-				printf("RST:   Error: No SPI flash device available.\n");
-			}
-			debug("SQ:    SPI flash sector size: 0x%llx\n", (unsigned long long)flash->sector_size);
-
-			erase_block_size = flash->sector_size; // Use the flash's sector size
-
-			run_command("sq probe", 0); // Probe flash to set ENV variables
-
-			overlay_str = getenv("overlay");
-			flashsize_str = getenv("flash_len");
-			if (overlay_str && flashsize_str) {
-				overlay = simple_strtoul(overlay_str, NULL, 16);
-				flashsize = simple_strtoul(flashsize_str, NULL, 16);
-
-				// Align overlay address to the sector size
-				unsigned long aligned_overlay = (overlay + erase_block_size - 1) & ~(erase_block_size - 1);
-
-				// Calculate the initial length to erase before alignment
-				length_to_erase = flashsize - aligned_overlay;
-
-				// Align length to the next block size without exceeding flash size
-				unsigned long aligned_length = (length_to_erase + erase_block_size - 1) & ~(erase_block_size - 1);
-				if (aligned_overlay + aligned_length > flashsize) {
-					// If alignment exceeds flash size, adjust length to not exceed flash
-					aligned_length = flashsize - aligned_overlay;
-					// Ensure adjusted length is also aligned to block size
-					aligned_length = aligned_length & ~(erase_block_size - 1);
-				}
-
-				if (aligned_overlay + aligned_length <= flashsize) {
-					debug("RST:   Aligned Overlay: 0x%lX, Flash size: 0x%lX, Length to erase: 0x%lX\n", aligned_overlay, flashsize, aligned_length);
-					sprintf(cmd, "sf erase 0x%lX 0x%lX", aligned_overlay, aligned_length);
-					debug("Executing command: %s\n", cmd);
-					if (run_command(cmd, 0) != 0) {
-						printf("RST:   Error: Failed to execute erase command.\n");
-					} else {
-						debug("RST:   Successfully executed: %s\n", cmd);
-					}
-				} else {
-					printf("RST:   Error: Erase range still exceeds flash size after adjustment.\n");
-				}
-			} else {
-				printf("RST:   Error: overlay or flash_len environment variable is not set.\n");
-			}
-		}
-	} else {
-		printf("KEY:   Reset button undefined\n");
-	}
+#endif
 
 	/* Platform Default GPIO Set */
 	handle_gpio_settings("gpio_default");
 
 	/* Platform USB Power */
 	handle_gpio_settings("gpio_usb_en");
-#endif
 
-#ifdef CONFIG_BITBANGMII
-	bb_miiphy_init();
-#endif
+	/* Set Hardware addresses from SoC S/N */
+	if (run_command("ethaddr init", 0) != 0) {
+		printf("ETHADDR:   init failed\n");
+	}
+
+	/* Probe for jz phy */
+	if (run_command("jznet init", 0) != 0) {
+		printf("JZNET:   init failed\n");
+	}
+
+	/*if (run_command("factory reset", 0) != 0) {
+		printf("FACTORY:   reset failed\n");
+	}*/
 
 	/* Try to get the value of the 'disable_sd' environment variable */
 	char* disable_sd = getenv("disable_sd");
 
-#if defined(CONFIG_CMD_NET)
-	int ret = 0;
-	char* disable_eth = getenv("disable_eth");
-
-#ifdef CONFIG_USB_ETHER_ASIX
-	char* ethact = getenv("ethact");
-	if (ethact && strncmp(ethact, "asx", 3) == 0) {
-		if (run_command("usb start", 0) != 0) {
-			printf("USB:   USB start failed\n");
-		}
+	/* Check if disable_sd is "false". */
+	if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
+		/* MMC specific user GPIO set */
+		handle_gpio_settings("gpio_mmc_power");
 	}
-#endif
-	int networkInitializationAttempted = 0;
 
-	/* Check if disable_eth is set to "true" */
-	if (disable_eth && strcmp(disable_eth, "true") == 0) {
-		/* disable_eth is true, so skip network initialization */
-		printf("Net:   Networking disabled (U-Boot)\n");
-		/* Handle GPIO settings since network init is skipped */
-		handle_gpio_settings("gpio_default_net");
+	/* IRCUT GPIO set */
+	handle_gpio_settings("gpio_ircut");
+	/* User defined GPIO set */
+	handle_gpio_settings("gpio_user");
+	/* User defined MOTOR GPIO set */
+	handle_gpio_settings("gpio_motor_v");
+	handle_gpio_settings("gpio_motor_h");
+
+	/* Check if 'disable_sd' was found and compare its value */
+	if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
+		/* The environment variable 'disable_sd' exists and its value is "false" */
+		#ifdef CONFIG_AUTO_UPDATE
+			run_command("sdupdate",0);
+		#endif
+		#ifdef CONFIG_CMD_SDSTART
+			run_command("sdstart",0);
+		#endif
+
+		printf("MMC:   Checking for boot/env files...\n");
+		if (!run_command("fatload mmc 0 ${baseaddr} boot.scr", 0)) {
+			printf("MMC:   Loading boot.scr\n");
+			run_command(BOOT_SCRIPT, 0);
+			run_command("source ${baseaddr}", 0);
+		}
+
+		if (!run_command("fatload mmc 0 ${baseaddr} uEnv.txt", 0)) {
+			printf("MMC:   Loading uEnv.txt\n");
+			run_command(ENV_FILE, 0);
+			run_command("env import -t -r ${baseaddr} ${filesize};setenv filesize;saveenv;", 0);
+		}
+
+		if (autoupdate_status == 3) {
+			printf("MMC:   Auto-update is set to 'full'. Resetting the device...\n");
+			do_reset(NULL, 0, 0, NULL);
+		}
 	} else {
-		/* Attempt network initialization */
-		networkInitializationAttempted = 1;
-		ret = jz_net_initialize(gd->bd);
-		if (ret < 0) {
-			debug("Net:   Network initialization failed.\n");
-			// Network initialization failed, handle GPIO settings here
-			handle_gpio_settings("gpio_default_net");
-		}
+			/* 'disable_sd' does not exist or is not "true" */
+			printf("MMC:   SD card disabled\n");
 	}
-
-#endif
-
-/* Check if disable_sd is "false". */
-if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
-	/* MMC specific user GPIO set */
-	handle_gpio_settings("gpio_mmc_power");
-}
-
-/* IRCUT GPIO set */
-handle_gpio_settings("gpio_ircut");
-/* User defined GPIO set */
-handle_gpio_settings("gpio_user");
-/* User defined MOTOR GPIO set */
-handle_gpio_settings("gpio_motor_v");
-handle_gpio_settings("gpio_motor_h");
-
-/* Check if 'disable_sd' was found and compare its value */
-if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
-/* The environment variable 'disable_sd' exists and its value is "false" */
-#ifdef CONFIG_AUTO_UPDATE
-	run_command("sdupdate",0);
-#endif
-#ifdef CONFIG_CMD_SDSTART
-	run_command("sdstart",0);
-#endif
-
-	printf("MMC:   Checking for boot/env files...\n");
-	if (!run_command("fatload mmc 0 ${baseaddr} boot.scr", 0)) {
-		printf("MMC:   Loading boot.scr\n");
-		run_command(BOOT_SCRIPT, 0);
-		run_command("source ${baseaddr}", 0);
-	}
-
-	if (!run_command("fatload mmc 0 ${baseaddr} uEnv.txt", 0)) {
-		printf("MMC:   Loading uEnv.txt\n");
-		run_command(ENV_FILE, 0);
-		run_command("env import -t -r ${baseaddr} ${filesize};setenv filesize;saveenv;", 0);
-	}
-
-	if (autoupdate_status == 3) {
-		printf("MMC:   Auto-update is set to 'full'. Resetting the device...\n");
-		do_reset(NULL, 0, 0, NULL);
-	}
-
-} else {
-	/* 'disable_sd' does not exist or is not "true" */
-	printf("MMC:   SD card disabled\n");
-}
 
 	/* main_loop() can return to retry autoboot, if so just run it again. */
 	for (;;)
