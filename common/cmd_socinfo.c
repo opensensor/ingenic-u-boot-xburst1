@@ -1,5 +1,11 @@
 #include <common.h>
 #include <command.h>
+#include <serial.h>
+
+#define SERIAL_NUM_ADDR1 0x13540200
+#define SERIAL_NUM_ADDR2 0x13540204
+#define SERIAL_NUM_ADDR3 0x13540208
+#define SERIAL_NUM_ADDR4 0x13540238 // T10/T20/T30
 
 int debug_socinfo = 0;
 
@@ -30,8 +36,6 @@ SocInfo socInfoTable[] = {
 	{"T31ZC", 0x0031, 0x0001, 0x0000, 0xDDDD, 0x0000},
 	{"T31ZL", 0x0031, 0x0001, 0x0000, 0x5555, 0x0000},
 	{"T31ZX", 0x0031, 0x0001, 0x0000, 0x6666, 0x0000},
-	{"T40NN", 0x0040, 0x00ED, 0x0000, 0x0000, 0x8888},
-	{"T40XP", 0x0040, 0x00f9, 0x0000, 0x0000, 0x7777},
 };
 
 static const char* get_soc_name(void) {
@@ -47,12 +51,18 @@ static const char* get_soc_name(void) {
 	unsigned int subsoctype1_shifted = (subsoctype1 >> 16) & 0xFFFF;
 	unsigned int subsoctype2_shifted = (subsoctype2 >> 16) & 0xFFFF;
 
+	uint32_t serial_part1 = readl(SERIAL_NUM_ADDR1);
+	uint32_t serial_part2 = readl(SERIAL_NUM_ADDR2);
+	uint32_t serial_part3 = readl(SERIAL_NUM_ADDR3);
+	uint32_t serial_part4 = readl(SERIAL_NUM_ADDR4 + 4);
+
 	if (debug_socinfo) {
 		printf("soc_id:      0x%08X [0x%04X]\n", soc_id, cpu_id);
 		printf("cppsr:       0x%08X [0x%02X]\n", cppsr, cppsr_extracted);
 		printf("subremark:   0x%08X [0x%02X]\n", subremark, subremark_shifted);
 		printf("subsoctype1: 0x%08X [0x%04X]\n", subsoctype1, subsoctype1_shifted);
 		printf("subsoctype2: 0x%08X [0x%04X]\n", subsoctype2, subsoctype2_shifted);
+		printf("Serial number: %u %u %u %u\n", serial_part1, serial_part2, serial_part3, serial_part4);
 	}
 
 	int i;
