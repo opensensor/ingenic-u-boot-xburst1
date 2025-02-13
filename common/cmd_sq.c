@@ -2,7 +2,6 @@
 #include <div64.h>
 #include <malloc.h>
 #include <spi_flash.h>
-#include <asm/io.h>
 
 extern struct spi_flash *get_flash(void);
 
@@ -432,6 +431,39 @@ static void update_mtdparts_env_nor_noapi(void)
 	}
 }
 
+uint64_t update_overlay_start_addr_nor_noapi(void)
+{
+    const char *rootfs_addr_str = getenv("rootfs_addr");
+    if (!rootfs_addr_str) {
+        printf("SQ: Error: Environment variable 'rootfs_addr' not set.\n");
+        return 0;
+    }
+    /* Convert the rootfs start address (flash address) from a string to a number */
+    uint64_t rootfs_addr = simple_strtoull(rootfs_addr_str, NULL, 16);
+
+    /* Compute the rootfs partition size by reading the SquashFS header.
+     * This function should read 64 bytes from flash at 'rootfs_addr', process the header,
+     * align the value, update the env variable "rootfs_size", and return the size in bytes.
+     */
+    uint64_t rootfs_size = compute_rootfs_partition_size_nor_noapi();
+    if (rootfs_size == 0) {
+        printf("SQ: Error: Unable to compute rootfs partition size.\n");
+        return 0;
+    }
+
+    /* The overlay partition starts immediately after the rootfs partition */
+    uint64_t overlay_start = rootfs_addr + rootfs_size;
+
+    /* Format the overlay start address as a hex string (e.g., "0x80000") */
+    char overlay_str[32];
+    sprintf(overlay_str, "0x%llX", overlay_start);
+    setenv("overlay", overlay_str);
+    printf("SQ: overlay start address set to: %s\n", overlay_str);
+
+    return overlay_start;
+}
+
+
 static int do_sq(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	if (argc != 2 ||
@@ -458,6 +490,7 @@ static int do_sq(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		compute_rootfs_partition_size_nor_noapi();
 		compute_kernel_partition_size();
 		update_mtdparts_env_nor_noapi();
+		update_overlay_start_addr_nor_noapi();
 	}
 
 	return CMD_RET_SUCCESS;
