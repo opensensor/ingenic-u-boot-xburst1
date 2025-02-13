@@ -104,7 +104,7 @@ static int do_factory_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 		run_command("reset", 0);
 		return CMD_RET_SUCCESS;
 	} else {
-		printf("RST:   Factory reset not performed (or failed).\n");
+		debug("RST:   Factory reset not performed (or failed).\n");
 		return CMD_RET_FAILURE;
 	}
 }
