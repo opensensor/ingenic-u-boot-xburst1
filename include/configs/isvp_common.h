@@ -696,6 +696,9 @@
 #define CONFIG_CMD_TFTPSRV
 #endif
 #define CONFIG_CMD_WATCHDOG
+#define CONFIG_CMD_ETHADDR
+#define CONFIG_CMD_FACTORY
+#define CONFIG_CMD_JZNET
 
 /* JFFS2 configuration */
 #if defined(CONFIG_CMD_JFFS2)
