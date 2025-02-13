@@ -458,7 +458,7 @@ uint64_t update_overlay_start_addr_nor_noapi(void)
     char overlay_str[32];
     sprintf(overlay_str, "0x%llX", overlay_start);
     setenv("overlay", overlay_str);
-    printf("SQ: overlay start address set to: %s\n", overlay_str);
+    printf("SQ:    overlay start address set to: %s\n", overlay_str);
 
     return overlay_start;
 }
