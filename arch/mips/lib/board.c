@@ -437,7 +437,7 @@ extern void board_usb_init(void);
 int checkboard(void)
 {
 	char output[100];
-	puts("Architecture: XBurst 1\n");
+	puts("Architecture: XBurst@I\n");
 	puts("Platform: ISVP\n");
 	sprintf(output, "Built profile: %s\n", SOC_VAR);
 	puts(output);
