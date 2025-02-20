@@ -275,8 +275,8 @@ uint32_t update_rootfs_address_nor_noapi(void)
 	}
 	kernel_flash_addr = simple_strtoul(kern_addr_str, NULL, 16);
 
-	/* Kernel will not be smaller than 1.4mb, so start search there... */
-	sprintf(read_cmd, "sf read ${baseaddr} 0x%X 0x%X", (unsigned int)(kernel_flash_addr + 0x140000), ROOTFS_READ_SIZE);
+	/* Kernel will not be smaller than 1.2mb, so start search there... */
+	sprintf(read_cmd, "sf read ${baseaddr} 0x%X 0x%X", (unsigned int)(kernel_flash_addr + 0x133120), ROOTFS_READ_SIZE);
 
 	/* Execute the flash read command to load the block into RAM */
 	ret = run_command(read_cmd, 0);
