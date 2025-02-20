@@ -1305,7 +1305,7 @@ s32 synopGMAC_check_phy_init(synopGMACdevice * gmacdev) {
 	if (data & 0x1000) {//Autonegotiation
 		//loop_count = DEFAULT_LOOP_VARIABLE;
 		/* delay 2 second */
-		loop_count = 100000;
+		loop_count = 20000;
 		while (loop_count-- > 0) {
 			udelay(100);
 			status = synopGMAC_read_phy_reg((u32 *)gmacdev->MacBase, gmacdev->PhyBase, PHY_STATUS_REG, &data);
