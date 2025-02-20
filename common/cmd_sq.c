@@ -288,7 +288,7 @@ uint32_t update_rootfs_address_nor_noapi(void)
 	/* Retrieve the RAM base address from the environment variable "baseaddr" */
 	baseaddr_str = getenv("baseaddr");
 	if (!baseaddr_str) {
-		printf("SQ:   Error: Environment variable 'baseaddr' not set.\n");
+		printf("SQ:    Error: Environment variable 'baseaddr' not set.\n");
 		return 0;
 	}
 	base_addr = simple_strtoul(baseaddr_str, NULL, 16);
@@ -297,7 +297,7 @@ uint32_t update_rootfs_address_nor_noapi(void)
 	/* Search through the loaded block for the rootfs magic value */
 	offset_found = search_for_magic(buf, ROOTFS_READ_SIZE, SQUASHFS_MAGIC);
 	if (offset_found < 0) {
-		printf("SQ:   Error: rootfs magic (0x%x) not found in flash block\n", SQUASHFS_MAGIC);
+		printf("SQ:    Error: rootfs magic (0x%x) not found in flash block\n", SQUASHFS_MAGIC);
 		return 0;
 	}
 
