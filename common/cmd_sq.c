@@ -193,7 +193,7 @@ int process_spi_flash_data(struct spi_flash *flash) {
 
 #define KERNEL_FLASH_OFFSET 0x50000
 #define KERNEL_READ_SIZE    0x100000
-#define ROOTFS_READ_SIZE    0x100000
+#define ROOTFS_READ_SIZE    0x150000
 
 static int search_for_magic(const char *buf, size_t size, uint32_t magic)
 {
