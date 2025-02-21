@@ -255,7 +255,7 @@ static int do_sdupdate(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 U_BOOT_CMD(
 	sdupdate, 2, 0, do_sdupdate,
 	"auto upgrade file from SD card to flash",
-	"sdupdate [type|file]\n"
+	"[type|file]\n"
 	"type: 0 = u-boot only\n"
 	"      1 = full image only\n"
 	"      none = try both\n"
