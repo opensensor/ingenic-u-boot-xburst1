@@ -400,7 +400,7 @@ extern void board_usb_init(void);
 	if (disable_sd != NULL && strcmp(disable_sd, "false") == 0) {
 		/* The environment variable 'disable_sd' exists and its value is "false" */
 		#ifdef CONFIG_AUTO_UPDATE
-			run_command("sdupdate",0);
+			run_command("sf probe-alt;sdupdate",0);
 		#endif
 		#ifdef CONFIG_CMD_SDSTART
 			run_command("sdstart",0);
@@ -420,7 +420,7 @@ extern void board_usb_init(void);
 		}
 
 		if (autoupdate_status == 3) {
-			printf("MMC:   Auto-update is set to 'full'. Resetting the device...\n");
+			printf("MMC:   Auto-update is set to 'full'. Reset to updated firmware...\n");
 			do_reset(NULL, 0, 0, NULL);
 		}
 	} else {
