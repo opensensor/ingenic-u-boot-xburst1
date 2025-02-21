@@ -504,13 +504,20 @@ static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[
 	} else if (strcmp(cmd, "probe-alt") == 0) {
 		ret = do_spi_flash_probe(argc, argv);
 		/* Grab flash chip size and save it */
-		char flashlen_str[32], flashsize_str[32];
+		char flashlen_str[32], flashsize_str[32], flashsector_str[32];
 		int64_t flashsize = flash->size;
+		int64_t flashsector = flash->sector_size;
+
 		sprintf(flashlen_str, "%llx", flashsize);
 		setenv("flash_len", flashlen_str);
+
 		sprintf(flashsize_str, "%lluk", flashsize / 1024);
 		setenv("flash_size", flashsize_str);
 		printf("SF:    flash_size env set to %s\n", flashsize_str);
+
+		sprintf(flashsector_str, "%lluk", flashsector);
+		setenv("flash_sector", flashsector_str);
+		printf("SF:    flash_sector env set to %s\n", flashsector_str);
 		goto done;
 	}
 
