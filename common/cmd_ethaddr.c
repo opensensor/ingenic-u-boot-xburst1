@@ -78,7 +78,7 @@ static void generate_or_set_mac_address(const char *var_name, const char *iface_
 void ethaddr_init(void) {
 #ifdef CONFIG_RANDOM_MACADDR
 	generate_or_set_mac_address("ethaddr", "ETH", false);
-	generate_or_set_mac_address("wlanmac", "WLAN", true);
+	generate_or_set_mac_address("wlan_mac", "WLAN", true);
 #endif
 }
 
