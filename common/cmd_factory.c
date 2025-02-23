@@ -1,7 +1,8 @@
 #include <common.h>
 #include <command.h>
+#include <configs/isvp_common.h>
 
-#define ALIGNMENT_BLOCK_SIZE        0x10000  // 64KB
+#define ALIGNMENT_BLOCK_SIZE	CONFIG_SFC_MIN_ALIGN
 
 static int erase_config_partition_from_mtdparts(void)
 {
@@ -140,12 +141,6 @@ static int factory_reset_internal(int force)
 	/* Proceed with reset operations (either forced or button checked) */
 	printf("RST:   Factory reset initiated%s.\n", force ? " (forced)" : "");
 
-	if (run_command("env default -f -a", 0) != 0) {
-		printf("RST:   Error: Failed to reset ENV defaults.\n");
-		ret_status = CMD_RET_FAILURE;
-	}
-	saveenv();
-
 	if (run_command("sf probe-alt", 0) != 0) {
 		printf("RST:   Error: SPI flash probe failed.\n");
 		ret_status = CMD_RET_FAILURE;
@@ -199,6 +194,13 @@ static int factory_reset_internal(int force)
 		printf("RST:   Error: overlay or flash_len environment variable is not set.\n");
 		ret_status = CMD_RET_FAILURE;
 	}
+
+	debug("RST:   Reset Environment...");
+	if (run_command("env default -f -a", 0) != 0) {
+		printf("RST:   Error: Failed to reset ENV defaults.\n");
+		ret_status = CMD_RET_FAILURE;
+	}
+	saveenv();
 
 	return ret_status;
 }
