@@ -38,14 +38,14 @@ static void generate_mac_from_serial(uint8_t *mac, uint32_t base1, uint32_t base
 	mac[5] = ((base1 ^ base2 ^ base3 ^ base4) & 0xFF) | 0x01; // Ensure the last bit is 1 for unicast
 }
 
-static void generate_or_set_mac_address(const char *iface_name, const char *iface_type, bool increment) {
+static void generate_or_set_mac_address(const char *var_name, const char *iface_type, bool increment) {
 	uint8_t addr[6];
 	uint32_t serial_part1 = readl(SERIAL_NUM_ADDR1);
 	uint32_t serial_part2 = readl(SERIAL_NUM_ADDR2);
 	uint32_t serial_part3 = readl(SERIAL_NUM_ADDR3);
 	uint32_t serial_part4 = readl(SERIAL_NUM_ADDR4 + 4);
 
-	if (!eth_getenv_enetaddr((char*)iface_name, addr)) {
+	if (!eth_getenv_enetaddr((char*)var_name, addr)) {
 		// Check if all serial parts are zero
 		if (serial_part1 == 0 && serial_part2 == 0 && serial_part3 == 0 && serial_part4 == 0) {
 			// Generate a random MAC address
@@ -60,7 +60,7 @@ static void generate_or_set_mac_address(const char *iface_name, const char *ifac
 			printf("Net:   MAC address for %s based on device serial set\n", iface_type);
 		}
 
-		if (eth_setenv_enetaddr((char*)iface_name, addr)) {
+		if (eth_setenv_enetaddr((char*)var_name, addr)) {
 			printf("Net:   Failed to set address for %s\n", iface_type);
 		} else {
 			saveenv();
