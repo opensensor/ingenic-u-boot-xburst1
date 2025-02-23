@@ -182,7 +182,7 @@ OBJCFLAGS += --gap-fill=0xff
 
 gccincdir := $(shell $(CC) -print-file-name=include)
 
-CPPFLAGS := $(DBGFLAGS) $(OPTFLAGS) $(RELFLAGS)		\
+CPPFLAGS := $(DBGFLAGS) $(OPTFLAGS) $(RELFLAGS) $(EXTRA_CPPFLAGS)	\
 	-D__KERNEL__
 
 # Enable garbage collection of un-used sections for SPL
