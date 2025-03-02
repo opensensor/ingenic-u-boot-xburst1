@@ -205,6 +205,11 @@ ifdef CONFIG_SPI_FLASH_BAR
 CPPFLAGS += -DCONFIG_SPI_FLASH_BAR
 endif
 
+# Enable external env arguments, typically from buildroot
+ifdef CONFIG_BOOTARGS_EXTERNAL
+CPPFLAGS += -DCONFIG_BOOTARGS_EXTERNAL
+endif
+
 ifneq ($(CONFIG_SYS_TEXT_BASE),)
 CPPFLAGS += -DCONFIG_SYS_TEXT_BASE=$(CONFIG_SYS_TEXT_BASE)
 endif
