@@ -918,9 +918,6 @@ CONFIG_GPIO_IRCUT_SETTINGS
 "baseaddr=0x80600000\0" \
 "panic_timeout=10\0" \
 "serialport=ttyS1\0" \
-"disable_eth=false\0" \
-"disable_sd=false\0" \
-"enable_updates=false\0" \
 "boot_complete=false\0" \
 "soc="CONFIG_SOC"\0" \
 CONFIG_EXTRA_SETTINGS \
