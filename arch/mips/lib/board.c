@@ -358,6 +358,7 @@ extern void board_usb_init(void);
 	misc_init_r();
 #endif
 	/* Check for factory reset input */
+	handle_gpio_settings("gpio_button");
 	if (run_command("factory reset-boot", 0) == 0) {
 		printf("RST:   reset successful, resetting system...\n");
 		run_command("reset", 0);
