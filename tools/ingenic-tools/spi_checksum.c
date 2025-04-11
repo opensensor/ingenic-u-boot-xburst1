@@ -43,6 +43,8 @@
 #define SKIP_SIZE 2048
 #elif defined(CONFIG_T41)
 #define SKIP_SIZE 2048
+#elif defined(CONFIG_C100)
+#define SKIP_SIZE 2048
 #endif
 
 #define le(a) (((a & 0xff)<<24) | ((a>>8 & 0xff)<< 16) | ((a>>16 & 0xff)<< 8) | ((a>>24 & 0xff)))
