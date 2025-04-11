@@ -555,7 +555,7 @@ int jz_net_initialize(bd_t *bis)
 #endif
 #if defined (CONFIG_T10) || \
 	defined (CONFIG_T20) || defined (CONFIG_T21) || defined (CONFIG_T23) || \
-	defined (CONFIG_T30) || defined (CONFIG_T31)
+	defined (CONFIG_T30) || defined (CONFIG_T31) || defined (CONFIG_C100)
 	/* initialize gmac gpio */
 	gpio_set_func(GPIO_PORT_B, GPIO_FUNC_0, 0x1EFC0);
 #endif

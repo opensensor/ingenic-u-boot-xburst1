@@ -38,6 +38,8 @@
 #include "jz_gpio/t30_gpio.c"
 #elif defined (CONFIG_T31)
 #include "jz_gpio/t31_gpio.c"
+#elif defined (CONFIG_C100)
+#include "jz_gpio/c100_gpio.c"
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;

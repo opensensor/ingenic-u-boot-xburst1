@@ -44,6 +44,9 @@
 #elif defined(__CONFIG_ISVP_T31_H__)
 #define CONFIG_T31
 #define CONFIG_SOC "t31"
+#elif defined(__CONFIG_ISVP_C100_H__)
+#define CONFIG_C100
+#define CONFIG_SOC "c100"
 #else
 #error please define ISVP config
 #endif
@@ -55,6 +58,8 @@
 #define T20X "T20X"
 #define T21N "T21N"
 #define T23N "T23N"
+#define T23ZN "T23ZN"
+#define T23X "T23X"
 #define T30N "T30N"
 #define T30L "T30L"
 #define T30X "T30X"
@@ -66,6 +71,7 @@
 #define T31X "T31X"
 #define T31A "T31A"
 #define T31AL "T31AL"
+#define C100 "C100"
 
 #if defined(CONFIG_T10) && defined(CONFIG_LITE_VERSION)
 #define SOC_VAR T10L
@@ -103,6 +109,8 @@
 #define SOC_VAR T31L
 #elif defined(CONFIG_T31)
 #define SOC_VAR T31N
+#elif defined(CONFIG_C100)
+#define SOC_VAR C100
 #endif
 
 /*
@@ -116,7 +124,7 @@
 */
 #define CONFIG_SPL_DDR_SOFT_TRAINING
 
-#if defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
+#if defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31) || defined(CONFIG_C100)
 #define CONFIG_DDR_INNOPHY
 #endif
 
@@ -142,11 +150,11 @@
 #define CONFIG_DDR_TYPE_DDR2
 #endif
 
-#if defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
+#if defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31) || defined(CONFIG_C100)
 #define DDR2_CHIP_DRIVER_OUT_STRENGTH	0
 #endif
 
-#if defined(CONFIG_T23) || defined(CONFIG_T31)
+#if defined(CONFIG_T23) || defined(CONFIG_T31) || defined(CONFIG_C100)
 #define DDR2_CHIP_MR0_DLL_RST
 #endif
 
@@ -204,6 +212,9 @@
 #elif defined(CONFIG_T30)
 #define APLL_900M
 #define DDR_500M
+#elif defined(CONFIG_C100)
+#define APLL_1392M
+#define DDR_600M
 #elif defined(CONFIG_T31) && defined(CONFIG_T31LC)
 #define APLL_1104M
 #define DDR_500M
@@ -487,7 +498,7 @@
 #error please define DDR_FREQ
 #endif
 
-#if defined(CONFIG_T21) || defined(CONFIG_T30) || defined(CONFIG_T31)
+#if defined(CONFIG_T21) || defined(CONFIG_T30) || defined(CONFIG_T31) || defined(CONFIG_C100)
 #define CONFIG_SYS_VPLL_FREQ		1200000000	/*If VPLL is not used, it must be set to 0*/
 #endif
 
@@ -632,7 +643,7 @@
 #endif
 
 #define CONFIG_BAUDRATE			115200
-#if defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31)
+#if defined(CONFIG_T21) || defined(CONFIG_T23) || defined(CONFIG_T30) || defined(CONFIG_T31) || defined(CONFIG_C100)
 #define CONFIG_SYS_UART_CONTROLLER_STEP	0x1000
 #endif
 
