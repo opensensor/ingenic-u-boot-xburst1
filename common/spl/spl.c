@@ -111,6 +111,96 @@ __weak void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 	image_entry();
 }
 
+/*
+ * Print the SOC ID information based on the chip ID registers
+ * This is a simplified version of the detection in cmd_socinfo.c
+ */
+static void print_hex(unsigned int value)
+{
+	static const char hex_chars[] = "0123456789ABCDEF";
+	char hex_str[9];
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		hex_str[7-i] = hex_chars[value & 0xF];
+		value >>= 4;
+	}
+	hex_str[8] = '\0';
+	puts(hex_str);
+}
+
+static void print_soc_id(void)
+{
+	unsigned int soc_id, subsoctype1, subsoctype2;
+	const char *soc_name = "Unknown";
+
+	/* Read all the registers needed for SOC detection */
+	soc_id = *((volatile unsigned int *)(0xb300002C));
+	subsoctype1 = *((volatile unsigned int *)(0xb3540238));
+	subsoctype2 = *((volatile unsigned int *)(0xb3540250));
+
+	/* Extract the relevant bits from each register */
+	unsigned int cpu_id = (soc_id >> 12) & 0xFFFF;
+	unsigned int subsoctype1_shifted = (subsoctype1 >> 16) & 0xFFFF;
+	unsigned int subsoctype2_shifted = (subsoctype2 >> 16) & 0xFFFF;
+
+	/* Match against the SOC info table from cmd_socinfo.c */
+	if (cpu_id == 0x0005 && subsoctype1_shifted == 0x0000) {
+		soc_name = "T10L";
+	} else if (cpu_id == 0x2000 && subsoctype1_shifted == 0x2222) {
+		soc_name = "T20X";
+	} else if (cpu_id == 0x2000 && subsoctype1_shifted == 0x3333) {
+		soc_name = "T20L";
+	} else if (cpu_id == 0x0021 && subsoctype1_shifted == 0x1111) {
+		soc_name = "T21N";
+	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x1111) {
+		soc_name = "T23N";
+	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x7777) {
+		soc_name = "T23ZN";
+	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x2222) {
+		soc_name = "T23X";
+	} else if (cpu_id == 0x0030 && subsoctype1_shifted == 0x3333) {
+		soc_name = "T30L";
+	} else if (cpu_id == 0x0030 && subsoctype1_shifted == 0x2222) {
+		soc_name = "T30X";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x4444) {
+		soc_name = "T31A";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0xCCCC) {
+		soc_name = "T31AL";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x3333) {
+		soc_name = "T31L";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0xEEEE &&
+	           subsoctype2_shifted == 0x300F) {
+		soc_name = "T31LC";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x1111) {
+		soc_name = "T31N";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x2222) {
+		soc_name = "T31X";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0xDDDD) {
+		soc_name = "T31ZC";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x5555) {
+		soc_name = "T31ZL";
+	} else if (cpu_id == 0x0031 && subsoctype1_shifted == 0x6666) {
+		soc_name = "T31ZX";
+	}
+
+	if (strcmp(soc_name, "Unknown") == 0) {
+		/* Print debug information if SOC is unknown */
+		puts("SoC: Unknown\n");
+		puts("SoC Debug Info: cpu_id=0x");
+		print_hex(cpu_id);
+		puts(" subsoctype1=0x");
+		print_hex(subsoctype1_shifted);
+		puts(" subsoctype2=0x");
+		print_hex(subsoctype2_shifted);
+		puts("\n");
+	} else {
+		puts("SoC: ");
+		puts(soc_name);
+		puts("\n");
+	}
+}
+
 #ifdef CONFIG_SPL_RAM_DEVICE
 static void spl_ram_load_image(void)
 {
@@ -262,6 +352,7 @@ void preloader_console_init(void)
 #if !defined(CONFIG_FAST_BOOT) && !defined (CONFIG_SIMULATION) && !defined(CONFIG_YMODEM_NO_PRINTF)
 	puts("\n\nThingino U-Boot for Ingenic " SOC_VAR " SPL " PLAIN_VERSION " (" U_BOOT_DATE " - " \
 			U_BOOT_TIME ")\n");
+	print_soc_id();
 #endif
 #ifdef CONFIG_SPL_DISPLAY_PRINT
 	spl_display_print();
