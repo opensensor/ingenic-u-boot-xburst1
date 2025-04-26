@@ -66,6 +66,8 @@ static const char* kernel_filenames[] = { KERNEL_FILENAMES(t21) };
 static const char* kernel_filenames[] = { KERNEL_FILENAMES(t30) };
 #elif defined(CONFIG_T31)
 static const char* kernel_filenames[] = { KERNEL_FILENAMES(t31) };
+#elif defined(CONFIG_C100)
+static const char* kernel_filenames[] = { KERNEL_FILENAMES(c100) };
 #else
 static const char* kernel_filenames[] = { NULL };  // Default case, do not load anything
 #endif

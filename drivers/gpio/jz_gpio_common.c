@@ -368,7 +368,7 @@ void process_gpio_token(char* token) {
 	// Check if the mode character is present and valid
 	char mode = (*endptr) ? *endptr : 'i'; // Default to 'i' (input) if no mode specified
 
-#if defined(CONFIG_T31)
+#if defined(CONFIG_T31) || defined(CONFIG_C100)
 	bool disablePullUp = false;
 	bool disablePullDown = false;
 
@@ -396,7 +396,7 @@ void process_gpio_token(char* token) {
 		case 'I': // Also treat uppercase 'I' as Input for consistency
 			gpio_direction_input(gpio);
 			printf("%ui", gpio);
-#if defined(CONFIG_T31)
+#if defined(CONFIG_T31) || defined(CONFIG_C100)
 			if (disablePullUp) {
 				gpio_disable_pull_up(gpio);
 				printf("u");
