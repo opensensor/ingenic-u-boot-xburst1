@@ -195,7 +195,7 @@ static void print_soc_id(void)
 		print_hex(subsoctype2_shifted);
 		puts("\n");
 	} else {
-		puts("SoC: ");
+		puts("Probing SoC... ");
 		puts(soc_name);
 		puts("\n");
 	}
