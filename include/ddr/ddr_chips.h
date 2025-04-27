@@ -56,4 +56,8 @@
 #ifdef CONFIG_DDR2_M14D1G1664A
 #include "./chips/DDR2_M14D1G1664A.h"
 #endif
+
+#ifdef CONFIG_DDR2_M14D2561616A
+#include "./chips/DDR2_M14D2561616A.h"
+#endif
 #endif /* __DDR_CHIPS_H__ */

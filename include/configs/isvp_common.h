@@ -59,6 +59,8 @@
 #define T21N "T21N"
 #define T23N "T23N"
 #define T23ZN "T23ZN"
+#define T23DL "T23DL"
+#define T23DN "T23DN"
 #define T23X "T23X"
 #define T30N "T30N"
 #define T30L "T30L"
@@ -144,6 +146,9 @@
 #define CONFIG_DDR_TYPE_DDR3
 #elif defined(CONFIG_DDR2_128M)
 #define CONFIG_DDR2_M14D1G1664A
+#define CONFIG_DDR_TYPE_DDR2
+#elif defined(CONFIG_DDR2_32M)
+#define CONFIG_DDR2_M14D2561616A
 #define CONFIG_DDR_TYPE_DDR2
 #else
 #define CONFIG_DDR2_M14D5121632A
@@ -630,7 +635,11 @@
 
 #define CONFIG_SYS_CBSIZE		2048
 #define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
+#if defined(CONFIG_DDR2_32M)
+#define CONFIG_SYS_MALLOC_LEN		(16 * 1024 * 1024)
+#else
 #define CONFIG_SYS_MALLOC_LEN		(32 * 1024 * 1024)
+#endif
 #define CONFIG_SYS_BOOTPARAMS_LEN	(256 * 1024)
 #define CONFIG_SYS_MONITOR_LEN		(230 * 1024)
 

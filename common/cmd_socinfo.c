@@ -24,6 +24,7 @@ SocInfo socInfoTable[] = {
 	{"T20L", 0x2000, 0x0001, 0x0000, 0x3333, 0x0000},
 	{"T21N", 0x0021, 0x0001, 0x0000, 0x1111, 0x0000},
 	{"T23N", 0x0023, 0x0000, 0x0000, 0x1111, 0x0000},
+	{"T23DL", 0x0023, 0x0000, 0x0000, 0x3333, 0x0000},
 	{"T23ZN", 0x0023, 0x0000, 0x0000, 0x7777, 0x0000},
 	{"T23X", 0x0023, 0x0000, 0x0000, 0x2222, 0x0000},
 	{"T30L", 0x0030, 0x0010, 0x0000, 0x3333, 0x0000},
@@ -72,7 +73,7 @@ static const char* get_soc_name(void) {
 		SocInfo s = socInfoTable[i];
 		if (cpu_id == s.socId &&
 			// cppsr_extracted == s.cppsr && // Disable for now
-			subremark_shifted == s.subremark &&
+			// subremark_shifted == s.subremark &&
 			subsoctype1_shifted == s.subsoctype1 &&
 			subsoctype2_shifted == s.subsoctype2) {
 			return s.name;

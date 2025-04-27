@@ -155,6 +155,8 @@ static void print_soc_id(void)
 		soc_name = "T21N";
 	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x1111) {
 		soc_name = "T23N";
+	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x3333) {
+		soc_name = "T23DL";
 	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x7777) {
 		soc_name = "T23ZN";
 	} else if (cpu_id == 0x0023 && subsoctype1_shifted == 0x2222) {
