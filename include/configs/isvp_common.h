@@ -199,7 +199,7 @@
 #elif defined(CONFIG_T23) && defined(CONFIG_T23N) && defined(CONFIG_LP)
 #define APLL_936M
 #define DDR_400M
-#elif defined(CONFIG_T23) && defined(CONFIG_T23N)
+#elif defined(CONFIG_T23) && (defined(CONFIG_T23N) || defined(CONFIG_T23DL))
 #define APLL_1188M
 #define DDR_600M
 #elif defined(CONFIG_T23)
