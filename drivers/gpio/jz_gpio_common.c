@@ -363,7 +363,13 @@ void dump_gpio_func(unsigned int gpio)
 
 void process_gpio_token(char* token) {
 	char *endptr;
-	unsigned gpio = simple_strtoul(token, &endptr, 10);
+	long gpio = simple_strtol(token, &endptr, 10);
+	
+	// Ignore negative GPIO values (like -1)
+	if (gpio < 0) {
+		printf(" [Ignoring GPIO %ld]", gpio);
+		return;
+	}
 
 	// Check if the mode character is present and valid
 	char mode = (*endptr) ? *endptr : 'i'; // Default to 'i' (input) if no mode specified
@@ -389,34 +395,34 @@ void process_gpio_token(char* token) {
 	}
 #endif
 
-	gpio_request(gpio, "gpio_set");
+	gpio_request((unsigned)gpio, "gpio_set");
 	printf(" ");
 	switch (mode) {
 		case 'i': // Input
 		case 'I': // Also treat uppercase 'I' as Input for consistency
-			gpio_direction_input(gpio);
-			printf("%ui", gpio);
+			gpio_direction_input((unsigned)gpio);
+			printf("%lui", gpio);
 #if defined(CONFIG_T31) || defined(CONFIG_C100)
 			if (disablePullUp) {
-				gpio_disable_pull_up(gpio);
+				gpio_disable_pull_up((unsigned)gpio);
 				printf("u");
 			}
 			if (disablePullDown) {
-				gpio_disable_pull_down(gpio);
+				gpio_disable_pull_down((unsigned)gpio);
 				printf("d");
 			}
 			#endif
 			break;
 		case 'o': // Output low
-			gpio_direction_output(gpio, 0);
-			printf("%uo", gpio);
+			gpio_direction_output((unsigned)gpio, 0);
+			printf("%luo", gpio);
 			break;
 		case 'O': // Output high
-			gpio_direction_output(gpio, 1);
-			printf("%uO", gpio);
+			gpio_direction_output((unsigned)gpio, 1);
+			printf("%luO", gpio);
 			break;
 		default:
-			printf("%u?%c", gpio, mode);
+			printf("%lu?%c", gpio, mode);
 			break;
 	}
 }
