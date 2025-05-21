@@ -20,6 +20,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <ctype.h>
+#include <unistd.h>
 
 #include <u-boot/zlib.h>
 
