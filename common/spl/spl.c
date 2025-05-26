@@ -358,6 +358,7 @@ void preloader_console_init(void)
 #endif
 	" SPL " PLAIN_VERSION " (" U_BOOT_DATE " - " \
 	U_BOOT_TIME ")\n");
+	print_soc_id();
 #endif
 #ifdef CONFIG_SPL_DISPLAY_PRINT
 	spl_display_print();
