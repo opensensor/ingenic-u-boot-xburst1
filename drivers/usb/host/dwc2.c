@@ -817,10 +817,10 @@ int chunk_msg(struct usb_device *dev, unsigned long pipe, int *pid, int in,
 		if (!in)
 			memcpy(aligned_buffer, (char *)buffer + done, len);
 
-			flush_dcache_range( (unsigned long)(aligned_buffer),
-				(unsigned long)(aligned_buffer) +roundup(len, CONFIG_SYS_CACHELINE_SIZE) );/*zm*/
+		flush_dcache_range( (unsigned long)(aligned_buffer),
+			(unsigned long)(aligned_buffer) +roundup(len, CONFIG_SYS_CACHELINE_SIZE) );/*zm*/
 
-		writel(virt_to_phys((unsigned long)aligned_buffer),
+		writel(virt_to_phys(aligned_buffer),
 		       &hc_regs->hcdma);
 
 

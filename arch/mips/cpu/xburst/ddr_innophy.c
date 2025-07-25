@@ -32,6 +32,9 @@
 DECLARE_GLOBAL_DATA_PTR;
 extern unsigned int sdram_size(int cs, struct ddr_params *p);
 
+/* Function declaration for GCC 15 compatibility */
+void phy_calibration(int al8_1x, int ah8_1x, int al8_2x, int ah8_2x);
+
 struct ddr_params *ddr_params_p = NULL;
 #ifndef CONFIG_FPGA
 extern void reset_dll(void);

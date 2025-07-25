@@ -13,6 +13,8 @@
 #ifndef _ASM_SYSTEM_H
 #define _ASM_SYSTEM_H
 
+/* Modified for GCC 15 compatibility: changed extern inline to static inline */
+
 #include <linux/config.h>
 #include <asm/sgidefs.h>
 #include <asm/ptrace.h>
@@ -20,7 +22,7 @@
 #include <linux/kernel.h>
 #endif
 
-extern __inline__ void
+static __inline__ void
 __sti(void)
 {
 	__asm__ __volatile__(
@@ -44,7 +46,7 @@ __sti(void)
  * R4000/R4400 need three nops, the R4600 two nops and the R10000 needs
  * no nops at all.
  */
-extern __inline__ void
+static __inline__ void
 __cli(void)
 {
 	__asm__ __volatile__(
@@ -205,7 +207,7 @@ do { \
  * For 32 and 64 bit operands we can take advantage of ll and sc.
  * FIXME: This doesn't work for R3000 machines.
  */
-extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
+static __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 {
 #ifdef CONFIG_CPU_HAS_LLSC
 	unsigned long dummy;

@@ -160,6 +160,8 @@ int gpio_get_value(unsigned gpio)
 	} else {
 #ifdef CONFIG_JZ_PCA953X
 		return pca953x_get_value(gpio);
+#else
+		return 0; /* Default value when PCA953X is not configured */
 #endif
 	}
 }
@@ -243,6 +245,7 @@ void gpio_disable_pull_down(unsigned gpio)
 }
 void gpio_set_pull_dir(unsigned gpio, int pull)
 {
+#ifndef CONFIG_T31
 	unsigned port= gpio / 32;
 	unsigned pin = gpio % 32;
 	if (pull) {
@@ -250,6 +253,11 @@ void gpio_set_pull_dir(unsigned gpio, int pull)
 	} else {
 		writel(1 << pin, GPIO_PXPDIRC(port));
 	}
+#else
+	/* T31 does not support pull direction control */
+	(void)gpio;
+	(void)pull;
+#endif
 }
 
 void gpio_as_irq_high_level(unsigned gpio)
@@ -364,7 +372,7 @@ void dump_gpio_func(unsigned int gpio)
 void process_gpio_token(char* token) {
 	char *endptr;
 	long gpio = simple_strtol(token, &endptr, 10);
-	
+
 	// Ignore negative GPIO values (like -1)
 	if (gpio < 0) {
 		printf(" [Ignoring GPIO %ld]", gpio);

@@ -59,7 +59,7 @@ void* norflash_memory_map_init()
 		return NULL;
 	}
 
-	flash_info[flash_num].start[0] = (unsigned long*)buf;
+	flash_info[flash_num].start[0] = (unsigned long)buf;
 
 	return buf;
 }

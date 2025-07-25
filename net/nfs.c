@@ -331,7 +331,7 @@ nfs_lookup_req(char *fname)
 	fnamelen = strlen(fname);
 
 	p = &(data[0]);
-	p = (uint32_t *)rpc_add_credentials((long *)p);
+	p = rpc_add_credentials(p);
 
 	if (supported_nfs_versions & NFSV2_FLAG) {
 		memcpy(p, dirfh, NFS_FHSIZE);

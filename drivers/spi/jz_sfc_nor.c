@@ -451,8 +451,7 @@ static int sfc_read(unsigned int addr, unsigned int addr_plus,
 }
 #endif
 
-#define CPM_SSICDR (0xb0000000 + 0x74)
-#define CPM_CLKGR0 (0xb0000000 + 0x20)
+/* CPM_SSICDR and CPM_CLKGR0 are defined in asm/arch/cpm.h */
 
 int sfc_init(void)
 {
@@ -748,7 +747,7 @@ int jz_sfc_write(struct spi_flash *flash, u32 offset, size_t length, const void 
 
 		/*dump_sfc_reg();*/
 
-		sfc_write_data(send_buf ,len);
+		sfc_write_data((unsigned int *)send_buf ,len);
 
 		retlen = len;
 
@@ -1084,7 +1083,7 @@ int sfc_nor_init(unsigned int idcode)
 	}
 }
 
-int sfc_nor_read(struct spi_flash *flash, unsigned int src_addr, unsigned int count,unsigned int dst_addr)
+int sfc_nor_read(struct spi_flash *flash, u32 src_addr, size_t count, void *dst_addr)
 {
 	int i;
 	int ret = 0;
@@ -1112,7 +1111,7 @@ int sfc_nor_read(struct spi_flash *flash, unsigned int src_addr, unsigned int co
 	return 0;
 }
 
-int sfc_nor_write(struct spi_flash *flash, unsigned int src_addr, unsigned int count,unsigned int dst_addr)
+int sfc_nor_write(struct spi_flash *flash, u32 src_addr, size_t count, const void *dst_addr)
 {
 	int i;
 	int ret = 0;
@@ -1261,7 +1260,7 @@ void read_sfcnand_id(u8 *response,size_t len)
 	unsigned char cmd[1];
 	cmd[0] = CMD_RDID;
 	sfc_send_cmd(&cmd[0],len,0,1,0,1,0);
-	sfc_read_data(response,len);
+	sfc_read_data((unsigned int *)response,len);
 	printf("id0=%02x\n",response[0]);
 	printf("id1=%02x\n",response[1]);
 	printf("SFC_STA_RT=0x%08x,\n",jz_sfc_readl(SFC_STA_RT));

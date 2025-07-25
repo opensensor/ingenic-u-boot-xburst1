@@ -11,7 +11,8 @@
 #endif /* USE_HOSTCC */
 #include <watchdog.h>
 #include <linux/string.h>
-#include <sha256.h>
+/* Use explicit path to avoid conflict with host system's /usr/include/sha256.h */
+#include "../include/sha256.h"
 
 /*
  * 32-bit integer manipulation macros (big endian)

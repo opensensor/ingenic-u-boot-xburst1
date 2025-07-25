@@ -46,7 +46,7 @@ PLATFORM_LDFLAGS =
 
 #########################################################################
 
-HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer \
+HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu11 -fcommon \
 		  $(HOSTCPPFLAGS)
 HOSTSTRIP	= strip
 
@@ -250,7 +250,7 @@ CPPFLAGS += -I$(TOPDIR)/include
 CPPFLAGS += -fno-builtin -ffreestanding -nostdinc	\
 	-isystem $(gccincdir) -pipe $(PLATFORM_CPPFLAGS)
 
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -std=gnu11 -fcommon
 
 ifdef BUILD_TAG
 CFLAGS += -DBUILD_TAG='"$(BUILD_TAG)"'

@@ -37,7 +37,7 @@ int pca953x_set_pol(u8 chip, uint mask, uint data);
 int pca953x_set_dir(u8 chip, uint mask, uint data);
 int pca953x_get_val(u8 chip);
 
-int pca953x_init();
+int pca953x_init(void);
 int pca953x_direction_output(int gpio, int val);
 int pca953x_direction_input(int gpio);
 

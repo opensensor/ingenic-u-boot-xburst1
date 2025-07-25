@@ -7,6 +7,10 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+/* Function declarations for GCC 15 compatibility */
+extern void handle_gpio_settings(const char *name);
+extern int jz_net_initialize(bd_t *bd);
+
 void jznet_init(void) {
 #ifdef CONFIG_BITBANGMII
 	bb_miiphy_init();
