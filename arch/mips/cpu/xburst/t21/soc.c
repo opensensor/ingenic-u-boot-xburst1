@@ -18,6 +18,9 @@
 #include <spl.h>
 #include <asm/ddr_innophy.h>
 
+/* Function declaration for GCC 15 compatibility */
+extern void flush_cache_all(void);
+
 #ifdef CONFIG_SPL_BUILD
 /* Pointer to as well as the global data structure for SPL */
 DECLARE_GLOBAL_DATA_PTR;
@@ -140,8 +143,6 @@ void board_init_f(ulong dummy)
 	board_init_r(NULL, 0);
 #endif
 }
-
-extern void flush_cache_all(void);
 
 void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
 {
