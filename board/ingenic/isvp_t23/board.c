@@ -24,12 +24,18 @@
 #include <nand.h>
 #include <net.h>
 #include <netdev.h>
+#include <mmc.h>
 #include <asm/gpio.h>
 #include <asm/arch/cpm.h>
 #include <asm/arch/nand.h>
 #include <asm/arch/mmc.h>
 #include <asm/arch/clk.h>
 #include <power/d2041_core.h>
+
+#ifdef CONFIG_JZ_MMC_MSC0
+/* ATBM6441 WiFi keepalive support */
+extern int atbm_init_keepalive(void);
+#endif
 
 extern int jz_net_initialize(bd_t *bis);
 struct cgu_clk_src cgu_clk_src[] = {
@@ -68,8 +74,83 @@ int misc_init_r(void)
 #endif
 	/* used for usb_dete */
 	gpio_enable_pull_up(GPIO_PB(24));//UART1 rx
+
+#ifdef CONFIG_JZ_MMC_MSC0
+	/* Power cycle ATBM6441 WiFi chip (like Linux SDK does) */
+	printf("\nATBM: Power cycling WiFi chip...\n");
+
+	/* Step 1: Power OFF (reset the chip) */
+	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) LOW (power off)...\n");
+	gpio_port_direction_output(GPIO_PORT_C, 9, 0);
+	udelay(100000);  /* Wait 100ms */
+
+	/* Step 2: Power ON */
+	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) HIGH (power on)...\n");
+	gpio_port_direction_output(GPIO_PORT_C, 9, 1);
+
+	/* Step 3: Set WL_WAKE_HOST if needed */
+	printf("ATBM: Setting WL_WAKE_HOST (GPIO_PC8) HIGH...\n");
+	gpio_port_direction_output(GPIO_PORT_C, 8, 1);
+
+	/* Step 4: Wait for chip to stabilize */
+	printf("ATBM: Waiting 500ms for chip to stabilize...\n");
+	udelay(500000);  /* Wait 500ms */
+	printf("ATBM: WiFi chip power cycle complete!\n\n");
+
+	/* Step 5: Initialize MSC0 (SDIO) controller - target WiFi on MSC0 */
+	{
+		struct mmc *mmc = find_mmc_device(0);
+		if (mmc) {
+			printf("ATBM: Initializing MSC0 (mmc device 0) for SDIO...\n");
+			int ret = mmc_init(mmc);
+			printf("ATBM: MSC0 init returned %d\n", ret);
+
+			if (ret == 0 && mmc->is_sdio) {
+				printf("\n========================================\n");
+				printf("ATBM: SDIO device enumerated successfully!\n");
+				printf("ATBM: Starting firmware load and keepalive...\n");
+				printf("========================================\n\n");
+
+				/* Call the keepalive initialization */
+				extern int atbm_init_keepalive(void);
+				ret = atbm_init_keepalive();
+				if (ret == 0) {
+					printf("\n========================================\n");
+					printf("ATBM: Keepalive started successfully!\n");
+					printf("ATBM: System should stay alive indefinitely\n");
+					printf("========================================\n\n");
+				} else {
+					printf("\n========================================\n");
+					printf("ATBM: Keepalive failed with error %d\n", ret);
+					printf("========================================\n\n");
+				}
+			}
+		} else {
+			printf("ATBM: ERROR - Could not find mmc device 0 (MSC0)!\n");
+		}
+	}
+#endif
+
 	return 0;
 }
+
+#ifdef CONFIG_BOARD_LATE_INIT
+int board_late_init(void)
+{
+	printf("\n========================================\n");
+	printf("BOARD_LATE_INIT: Starting...\n");
+	printf("========================================\n\n");
+
+#ifdef CONFIG_JZ_MMC_MSC0
+	/* Initialize ATBM6441 WiFi keepalive to prevent watchdog reboot */
+	/* This runs late in boot sequence, after MMC subsystem is fully initialized */
+	atbm_init_keepalive();
+#else
+	printf("CONFIG_JZ_MMC_MSC0 not defined!\n");
+#endif
+	return 0;
+}
+#endif
 
 
 

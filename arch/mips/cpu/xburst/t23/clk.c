@@ -48,7 +48,7 @@ struct cgu cgu_clk_sel[CGU_CNT] = {
 	[RSA] = {1, CPM_RSACDR, 30, MPLL, {APLL, MPLL, -1}, 29, 28, 27},
 	[LCD] = {1, CPM_LPCDR, 30, MPLL, {APLL, MPLL, -1}, 28, 27, 26},
 	[MSC] = {1, CPM_MSC0CDR, 30, CONFIG_CPU_SEL_PLL, {APLL, MPLL, -1}, 29, 28, 27},
-	[MSC1] = {0, CPM_MSC1CDR, 0, 0, {-1, -1, -1, -1}, 29, 28, 27},
+	[MSC1] = {1, CPM_MSC1CDR, 30, CONFIG_CPU_SEL_PLL, {APLL, MPLL, -1}, 29, 28, 27},  /* ENABLED for SDIO WiFi */
 	[I2S_SPK] = {1, CPM_I2SSPKCDR, 30, APLL, {APLL, MPLL, -1}, 29, 28, 27}, //Needs to be reconfigured; i2s uses APLL
 	[I2S_MIC] = {1, CPM_I2SMICCDR, 30, APLL, {APLL, MPLL, -1}, 29, 28, 27}, //Needs to be reconfigured; i2s uses APLL
 #ifdef CONFIG_BURNER

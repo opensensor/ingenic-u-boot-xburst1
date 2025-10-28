@@ -160,6 +160,8 @@ int gpio_get_value(unsigned gpio)
 	} else {
 #ifdef CONFIG_JZ_PCA953X
 		return pca953x_get_value(gpio);
+#else
+		return 0;
 #endif
 	}
 }

@@ -1211,8 +1211,13 @@ block_dev_desc_t *mmc_get_dev(int dev)
 int mmc_start_init(struct mmc *mmc)
 {
 	int err;
+	int cd;
 
-	if (mmc_getcd(mmc) == 0) {
+	cd = mmc_getcd(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC: mmc_getcd() = %d\n", cd);
+#endif
+	if (cd == 0) {
 		mmc->has_init = 0;
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 		printf("MMC: no card present\n");
@@ -1220,20 +1225,29 @@ int mmc_start_init(struct mmc *mmc)
 		return NO_CARD_ERR;
 	}
 
-	if (mmc->has_init)
+	if (mmc->has_init) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: already initialized\n");
+#endif
 		return 0;
+	}
 
 	err = mmc->init(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC: mmc->init() returned %d\n", err);
+#endif
 
 	if (err)
 		return err;
 
 	mmc_set_bus_width(mmc, 1);
-	mmc_set_clock(mmc, 1);
+	mmc_set_clock(mmc, mmc->f_min);  /* Use minimum frequency (200-400kHz) for initialization */
 
 	/* Reset the Card */
 	err = mmc_go_idle(mmc);
-
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC:   CMD0 (GO_IDLE) returned: %d\n", err);
+#endif
 	if (err)
 		return err;
 
@@ -1242,15 +1256,160 @@ int mmc_start_init(struct mmc *mmc)
 
 	/* Test for SD version 2 */
 	err = mmc_send_if_cond(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC:   CMD8 (SEND_IF_COND) returned: %d\n", err);
+#endif
 
 	/* Now try to get the SD card's operating condition */
 	err = sd_send_op_cond(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC:   ACMD41 (SD_SEND_OP_COND) returned: %d\n", err);
+#endif
 
-	/* If the command timed out, we check for an MMC card */
-	if (err == TIMEOUT) {
+	/* If SD init did not succeed, check for an MMC card (and then SDIO) */
+	if (err) {
 		err = mmc_send_op_cond(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC:   CMD1 (MMC_SEND_OP_COND) returned: %d\n", err);
+#endif
 
-		if (err && err != IN_PROGRESS) {
+		/* If MMC also failed, try SDIO (CMD5). For MSC1 (dev=1), also try SDIO even if CMD1 returned IN_PROGRESS. */
+		if (err && (err != IN_PROGRESS || mmc->block_dev.dev == 1)) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			if (err == IN_PROGRESS && mmc->block_dev.dev == 1)
+				printf("MMC:   CMD1 returned IN_PROGRESS, but dev=1; forcing SDIO probe\n");
+			printf("MMC:   Trying SDIO initialization (CMD5)...\n");
+#endif
+			/* Try SDIO CMD5 - IO_SEND_OP_COND */
+			struct mmc_cmd cmd;
+			int sdio_err;
+			int i;
+
+			/* CMD5 with arg=0 to query OCR */
+			cmd.cmdidx = 5;  /* IO_SEND_OP_COND */
+			cmd.resp_type = MMC_RSP_R4;
+			cmd.cmdarg = 0;
+
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			printf("MMC:   Sending CMD5 with arg=0 to query OCR...\n");
+#endif
+			sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			printf("MMC:   CMD5 query returned: %d, response[0]=0x%08x\n", sdio_err, cmd.response[0]);
+#endif
+			if (sdio_err == 0) {
+				unsigned int ocr = cmd.response[0] & 0x00FFFFFF;
+				unsigned int matched_ocr;
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+				printf("MMC:   SDIO device detected! OCR=0x%06x\n", ocr);
+				printf("MMC:   Host voltages: 0x%08x\n", mmc->voltages);
+#endif
+				/* Match host and card voltages */
+				matched_ocr = ocr & mmc->voltages;
+				if (!matched_ocr) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+					printf("MMC:   No matching voltage! Using card OCR anyway.\n");
+#endif
+					matched_ocr = ocr;  /* Try anyway */
+				}
+
+				/* CMD5 with voltage to initialize - loop until BUSY bit set */
+				for (i = 0; i < 100; i++) {
+					cmd.cmdarg = matched_ocr;
+					sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+					if (i < 5 || i % 10 == 0) {  /* Print first 5 and every 10th */
+						printf("MMC:   CMD5 retry %d: err=%d, resp=0x%08x\n",
+							i, sdio_err, cmd.response[0]);
+					}
+#endif
+					if (sdio_err == 0 && (cmd.response[0] & 0x80000000)) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   SDIO device ready after %d retries!\n", i + 1);
+#endif
+						/* Mark as SDIO device */
+						mmc->is_sdio = 1;  /* Set SDIO flag */
+						mmc->op_cond_pending = 0; /* Cancel any MMC op_cond polling */
+						mmc->version = SD_VERSION_2;  /* Treat as SD v2 for now */
+						mmc->ocr = cmd.response[0];
+						mmc->high_capacity = 0;
+
+						/* Wait for card to be ready for next command */
+						udelay(10000);  /* 10ms delay */
+
+						/* SDIO: issue CMD3 to obtain RCA, then CMD7 to select before IO cmds */
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   Sending CMD3 to get RCA...\n");
+#endif
+						cmd.cmdidx = 3;  /* SEND_RELATIVE_ADDR */
+						cmd.cmdarg = 0;
+						cmd.resp_type = MMC_RSP_R6;
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD3 returned: %d, response: 0x%08x\n", sdio_err, cmd.response[0]);
+#endif
+						if (!sdio_err) {
+							unsigned int r6 = cmd.response[0];
+							unsigned int rca = (r6 >> 16) & 0xFFFF;
+							if (rca == 0)
+								rca = 0x0001; /* Fallback */
+							mmc->rca = rca;
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   Got RCA: 0x%04x\n", mmc->rca);
+#endif
+						} else {
+							/* If R6 was not obtained (timeout etc.), fallback to RCA=1 */
+							mmc->rca = 0x0001;
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   WARNING - CMD3 failed; using default RCA=0x0001\n");
+#endif
+						}
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   Sending CMD7 to select card (RCA=0x%04x)...\n", mmc->rca);
+#endif
+						cmd.cmdidx = 7;  /* SELECT/DESELECT_CARD */
+						cmd.cmdarg = mmc->rca << 16;
+						cmd.resp_type = MMC_RSP_R1b;
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD7 returned: %d, response: 0x%08x\n", sdio_err, cmd.response[0]);
+#endif
+						/* Give the card some time after selection */
+						udelay(10000);
+
+						/* Now try CMD52 on Function 0 CCCR[0x00] */
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   SDIO: probing CCCR with CMD52 (F0, addr 0x00) ...\n");
+#endif
+						cmd.cmdidx = 52;  /* CMD52 = IO_RW_DIRECT */
+						cmd.resp_type = MMC_RSP_R5;
+						/* Read Function 0, Address 0x00 (CCCR version/capabilities) */
+						cmd.cmdarg = (0 << 31) | (0 << 28) | (0 << 27) | (0x00 << 9);
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD52 read CCCR[0x00]: err=%d, resp=0x%08x\n", sdio_err, cmd.response[0]);
+#endif
+						if (sdio_err) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   ERROR - SDIO CMD52 CCCR read failed (%d)\n", sdio_err);
+#endif
+							return sdio_err;
+						}
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   SDIO CCCR probe OK; SDIO initialization complete\n");
+#endif
+						return 0;  /* Success! */
+					}
+					if (sdio_err != 0) {
+						break;  /* Stop if command fails */
+					}
+					udelay(10000);  /* 10ms between retries */
+				}
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+				printf("MMC:   SDIO timeout after %d retries\n", i);
+#endif
+			}
+
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			printf("MMC:   Card did not respond to voltage select!\n");
 #endif
@@ -1271,8 +1430,17 @@ static int mmc_complete_init(struct mmc *mmc)
 	if (mmc->op_cond_pending)
 		err = mmc_complete_op_cond(mmc);
 
-	if (!err)
+	/* Skip mmc_startup() for SDIO devices - they don't need SD/MMC card init */
+	if (!err && !mmc->is_sdio) {
 		err = mmc_startup(mmc);
+	} else if (mmc->is_sdio) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: SDIO device - skipping mmc_startup()\n");
+#endif
+		/* SDIO device is already initialized by CMD5 sequence */
+		err = 0;
+	}
+
 	if (err)
 		mmc->has_init = 0;
 	else
@@ -1286,13 +1454,36 @@ int mmc_init(struct mmc *mmc)
 	int err = IN_PROGRESS;
 	unsigned start = get_timer(0);
 
-	if (mmc->has_init)
-		return 0;
-	if (!mmc->init_in_progress)
-		err = mmc_start_init(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+	printf("MMC: mmc_init() called, has_init=%d, init_in_progress=%d\n",
+		mmc->has_init, mmc->init_in_progress);
+#endif
 
-	if (!err || err == IN_PROGRESS)
+	if (mmc->has_init) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: Already initialized, returning 0\n");
+#endif
+		return 0;
+	}
+	if (!mmc->init_in_progress) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: Calling mmc_start_init()...\n");
+#endif
+		err = mmc_start_init(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: mmc_start_init() returned %d\n", err);
+#endif
+	}
+
+	if (!err || err == IN_PROGRESS) {
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: Calling mmc_complete_init()...\n");
+#endif
 		err = mmc_complete_init(mmc);
+#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+		printf("MMC: mmc_complete_init() returned %d\n", err);
+#endif
+	}
 	debug("%s: %d, time %lu\n", __func__, err, get_timer(start));
 	return err;
 }

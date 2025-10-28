@@ -52,11 +52,59 @@ static void jz_mmc_writel(uint32_t value, struct jz_mmc_priv *priv, uintptr_t of
 	writel(value, priv->base + off);
 }
 
+static void jz_mmc_soft_reset(struct jz_mmc_priv *priv)
+{
+	/* Save and restore clock divider */
+	uint32_t clkrt = jz_mmc_readl(priv, MSC_CLKRT);
+
+	/* Issue controller reset and wait until complete */
+	jz_mmc_writel(MSC_CTRL_RESET, priv, MSC_CTRL);
+#if defined(CONFIG_M200) || \
+	defined(CONFIG_T10) || defined(CONFIG_T15) || \
+	defined(CONFIG_T20) || defined(CONFIG_T21) || defined(CONFIG_T23) || \
+	defined(CONFIG_T30) || defined(CONFIG_T31) || defined(CONFIG_C100)
+	{
+		uint32_t tmp = jz_mmc_readl(priv, MSC_CTRL);
+		tmp &= ~MSC_CTRL_RESET;
+		jz_mmc_writel(tmp, priv, MSC_CTRL);
+	}
+#else
+	while (jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_IS_RESETTING)
+		;
+#endif
+
+	/* Re-enable continuous clock */
+	{
+		uint32_t ctrl = jz_mmc_readl(priv, MSC_CTRL);
+		ctrl &= ~MSC_CTRL_CLOCK_CONTROL_MASK;
+		ctrl |= MSC_CTRL_CLOCK_CONTROL_START;
+		jz_mmc_writel(ctrl, priv, MSC_CTRL);
+	}
+
+	/* Clear any pending flags and restore clock divider */
+	jz_mmc_writel(0xffffffff, priv, MSC_IFLG);
+	jz_mmc_writel(clkrt, priv, MSC_CLKRT);
+}
+
 static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 						struct mmc_data *data)
 {
 	struct jz_mmc_priv *priv = mmc->priv;
 	uint32_t stat, cmdat = 0;
+
+		/* Track last response to mitigate stale register reuse on timeouts */
+		static uint32_t last_resp0 = 0;
+		static uint32_t last_cmdidx = 0;
+
+		/* Workaround: after CMD5, controller may latch stale RES; reset before next cmd */
+		if (last_cmdidx == 5 && cmd->cmdidx != 5) {
+		#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			printf("JZ_MMC: Performing soft reset after CMD5 before CMD%d\n", cmd->cmdidx);
+		#endif
+			jz_mmc_soft_reset(priv);
+			/* Force next command to emit 80 init clocks to flush any latched response */
+			priv->flags &= ~JZ_MMC_SENT_INIT;
+		}
 
 	/* setup command */
 	jz_mmc_writel(cmd->cmdidx, priv, MSC_CMD);
@@ -83,7 +131,7 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	case MMC_RSP_R2:
 		cmdat |= MSC_CMDAT_RESPONSE_R2;
 		break;
-	case MMC_RSP_R3:
+	case MMC_RSP_R3:  /* Also handles MMC_RSP_R4 (SDIO) - same format */
 		cmdat |= MSC_CMDAT_RESPONSE_R3;
 		break;
 	default:
@@ -105,9 +153,7 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	jz_mmc_writel(cmdat, priv, MSC_CMDAT);
 
 #ifndef CONFIG_SPL_BUILD
-	jz_mmc_writel(0xffffffff, priv, MSC_IMASK);
-	/* clear interrupts */
-	jz_mmc_writel(0xffffffff, priv, MSC_IFLG);
+	/* Keep IMASK/IFLG as-is; we'll clear flags after reading response */
 #endif
 
 	/* start the command (& the clock) */
@@ -116,28 +162,69 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	/* wait for completion */
 	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES))))
 		udelay(10000);
-	jz_mmc_writel(stat, priv, MSC_IFLG);
-	if (stat & MSC_IREG_TIME_OUT_RES)
-		return TIMEOUT;
+	/* Do not clear IFLG here; read response first like Linux driver */
 
-	if (cmd->resp_type & MMC_RSP_PRESENT) {
-		/* read the response */
-		if (cmd->resp_type & MMC_RSP_136) {
-			uint16_t a, b, c, i;
-			a = jz_mmc_readw(priv, MSC_RES);
-			for (i = 0; i < 4; i++) {
-				b = jz_mmc_readw(priv, MSC_RES);
-				c = jz_mmc_readw(priv, MSC_RES);
-				cmd->response[i] = (a << 24) | (b << 8) | (c >> 8);
-				a = c;
-			}
-		} else {
-			cmd->response[0] = jz_mmc_readw(priv, MSC_RES) << 24;
-			cmd->response[0] |= jz_mmc_readw(priv, MSC_RES) << 8;
-			cmd->response[0] |= jz_mmc_readw(priv, MSC_RES) & 0xff;
-		}
+	/* Determine if we may accept a response despite timeout (SDIO quirk) */
+	int timed_out = (stat & MSC_IREG_TIME_OUT_RES) != 0;
+	int allow_timeout_resp = 0;
+	if (timed_out && (cmd->resp_type & MMC_RSP_PRESENT)) {
+		/* Only CMD5 (R4) can have valid response despite TIMEOUT on this controller */
+		if (cmd->cmdidx == 5)
+			allow_timeout_resp = 1;
 	}
 
+	if (cmd->resp_type & MMC_RSP_PRESENT) {
+		/* read the response using 32-bit accesses like Linux driver */
+		if (cmd->resp_type & MMC_RSP_136) {
+			uint32_t res;
+			int i;
+			res = jz_mmc_readl(priv, MSC_RES);
+			for (i = 0; i < 4; i++) {
+				cmd->response[i] = res << 24;
+				res = jz_mmc_readl(priv, MSC_RES);
+				cmd->response[i] |= res << 8;
+				res = jz_mmc_readl(priv, MSC_RES);
+				cmd->response[i] |= res >> 8;
+			}
+		} else {
+			uint32_t res;
+			res = jz_mmc_readl(priv, MSC_RES);
+			cmd->response[0] = res << 24;
+			res = jz_mmc_readl(priv, MSC_RES);
+			cmd->response[0] |= res << 8;
+			res = jz_mmc_readl(priv, MSC_RES);
+			cmd->response[0] |= res & 0xff;
+		}
+
+		/* If TIMEOUT flagged, decide whether to accept or fail */
+		if (timed_out) {
+			if (!allow_timeout_resp) {
+				jz_mmc_writel(stat, priv, MSC_IFLG);
+				return TIMEOUT;
+			} else {
+				/* Mitigate cached/stale response: reject if identical to last resp from a different cmd */
+				if ((cmd->response[0] == last_resp0) && (last_cmdidx != cmd->cmdidx)) {
+				#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+					printf("JZ_MMC: TIMEOUT+stale resp reuse detected for CMD%d (resp=0x%08x); treating as TIMEOUT\n", cmd->cmdidx, cmd->response[0]);
+				#endif
+					jz_mmc_writel(stat, priv, MSC_IFLG);
+					return TIMEOUT;
+				}
+			#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+				printf("JZ_MMC: TIMEOUT flagged but accepting response for CMD%d (resp=0x%08x) due to SDIO quirk\n", cmd->cmdidx, cmd->response[0]);
+			#endif
+			}
+		}
+
+		/* Update last response tracking when a response is actually read */
+		last_resp0 = cmd->response[0];
+		/* Now that response was read/handled, clear the IFLG bits for this cmd */
+		jz_mmc_writel(stat, priv, MSC_IFLG);
+
+		last_cmdidx = cmd->cmdidx;
+	}
+
+	/* For R1b, still wait for PRG_DONE if applicable */
 	if (cmd->resp_type == MMC_RSP_R1b) {
 		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE));
 		jz_mmc_writel(MSC_IREG_PRG_DONE, priv, MSC_IFLG);
@@ -229,7 +316,7 @@ static void jz_mmc_set_ios(struct mmc *mmc)
 	struct jz_mmc_priv *priv = mmc->priv;
 #ifndef CONFIG_FPGA
 	uint32_t real_rate = 0;
-	uint32_t lpm = LPM_LPM;
+	uint32_t lpm = 0;
 	uint8_t clk_div = 0;
 
 	if (mmc->clock > 1000000) {
@@ -299,8 +386,15 @@ static int jz_mmc_core_init(struct mmc *mmc)
 	while (jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_IS_RESETTING);
 #endif
 
-	/* enable low power mode */
-	jz_mmc_writel(0x1, priv, MSC_LPM);
+	/* Ensure continuous clock: SDIO requires it; enable for all MSC controllers */
+	printf("MMC: Controller base=0x%08lx\n", priv->base);
+	{
+		uint32_t ctrl = jz_mmc_readl(priv, MSC_CTRL);
+		ctrl &= ~MSC_CTRL_CLOCK_CONTROL_MASK;
+		ctrl |= MSC_CTRL_CLOCK_CONTROL_START;
+		jz_mmc_writel(ctrl, priv, MSC_CTRL);
+		printf("MSC: Enabled continuous clock (CTRL=0x%08x)\n", ctrl);
+	}
 
 	/* maximum timeouts */
 //	jz_mmc_writel(0xffffffff, priv, MSC_RESTO); //use the default value for decreasing time by ykliu
@@ -335,7 +429,13 @@ static void jz_mmc_init_one(int idx, int controller, uintptr_t base, int clock)
 #else
 	mmc->init = NULL;
 #endif
-	mmc->getcd = NULL;
+	/* For MSC1 (SDIO WiFi), always report card present (non-removable device) */
+	if (controller == 1) {
+		/* MSC1: Force card detect to always return "present" for ATBM6441 WiFi */
+		mmc->getcd = NULL;  /* NULL means "always present" in some MMC code paths */
+	} else {
+		mmc->getcd = NULL;
+	}
 	mmc->getwp = NULL;
 
 	mmc->voltages = MMC_VDD_27_28 |
@@ -379,12 +479,15 @@ void jz_mmc_init(void)
 	int i = 0;
 
 #if defined(CONFIG_JZ_MMC_MSC0) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 0))
+	printf("MMC: Registering MSC0 at index %d, base=0x%08x\n", i, MSC0_BASE);
 	jz_mmc_init_one(i++, 0, MSC0_BASE, MSC0);
 #endif
-#if defined(CONFIG_JZ_MMC_MSC1) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 1))
+#if defined(CONFIG_JZ_MMC_MSC1) && !defined(CONFIG_JZ_MMC_DISABLE_MSC1) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 1))
+	printf("MMC: Registering MSC1 at index %d, base=0x%08x\n", i, MSC1_BASE);
 	jz_mmc_init_one(i++, 1, MSC1_BASE, MSC1);
 #endif
 #if defined(CONFIG_JZ_MMC_MSC2) && (!defined(CONFIG_SPL_BUILD) || (CONFIG_JZ_MMC_SPLMSC == 2))
+	printf("MMC: Registering MSC2 at index %d, base=0x%08x\n", i, MSC2_BASE);
 	jz_mmc_init_one(i++, 2, MSC2_BASE, MSC2);
 #endif
 }

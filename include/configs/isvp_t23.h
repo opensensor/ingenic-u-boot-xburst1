@@ -97,15 +97,27 @@
 #define CONFIG_JZ_MMC			1
 #endif  /* JZ_MMC_MSC0 || JZ_MMC_MSC1 */
 
+/* Disable MSC1 registration to target MSC0 exclusively */
+#define CONFIG_JZ_MMC_DISABLE_MSC1 1
+
+#if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_JZ_MMC_MSC1)
+/* Both MSC0 (SD card) and MSC1 (SDIO WiFi) enabled */
+#define CONFIG_JZ_MMC_SPLMSC		1
+#define CONFIG_JZ_MMC_MSC0_PB		1
+#define CONFIG_JZ_MMC_MSC1_PC		1
+#else
 #if defined(CONFIG_JZ_MMC_MSC0)
+/* MSC0 only (SD card) */
 #define CONFIG_JZ_MMC_SPLMSC		0
 #define CONFIG_JZ_MMC_MSC0_PB		1
 #endif
 
 #if defined(CONFIG_JZ_MMC_MSC1)
+/* MSC1 only (SDIO WiFi) */
 #define CONFIG_JZ_MMC_SPLMSC		1
-#define CONFIG_JZ_MMC_MSC1_PB		1
+#define CONFIG_JZ_MMC_MSC1_PC		1
 #endif
+#endif /* JZ_MMC_MSC0 && JZ_MMC_MSC1 */
 
 /*
 #if defined(CONFIG_SFC_COMMAND)
@@ -196,5 +208,12 @@
 */
 #define CONFIG_GPIO_SETTINGS \
 ""
+
+/* I2C Configuration for PMIC access */
+#define CONFIG_INGENIC_SOFT_I2C
+#define CONFIG_SYS_I2C
+#define CONFIG_SYS_I2C_INGENIC
+#define CONFIG_SYS_I2C_SPEED		100000
+#define CONFIG_CMD_I2C
 
 #endif /*__CONFIG_ISVP_T23_H__*/
