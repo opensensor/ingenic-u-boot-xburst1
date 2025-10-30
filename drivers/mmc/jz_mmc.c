@@ -431,66 +431,13 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 	/* start the command (& the clock) */
 	jz_mmc_writel(MSC_CTRL_START_OP, priv, MSC_CTRL);
 
-#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-		if (cmd->cmdidx == 3 || cmd->cmdidx == 52) {
-			printf("JZ_MMC: Flushing any stale RES before CMD%d completion\n", cmd->cmdidx);
-		}
-#endif
-		if (cmd->cmdidx == 3 || cmd->cmdidx == 52) {
-			volatile uint32_t d0 = jz_mmc_readl(priv, MSC_RES);
-			volatile uint32_t d1 = jz_mmc_readl(priv, MSC_RES);
-			volatile uint32_t d2 = jz_mmc_readl(priv, MSC_RES);
-			volatile uint32_t d3 = jz_mmc_readl(priv, MSC_RES);
-#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-			printf("  CMD%d pre-wait flush: RES=[0]=0x%08x [1]=0x%08x [2]=0x%08x [3]=0x%08x\n",
-			       cmd->cmdidx, (uint32_t)d0, (uint32_t)d1, (uint32_t)d2, (uint32_t)d3);
-#endif
-		}
-
-
-	/* wait for completion using STAT; add verbose trace for CMD3/CMD7/CMD52 */
-	if (cmd->cmdidx == 3 || cmd->cmdidx == 7 || cmd->cmdidx == 52) {
-#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-		printf("JZ_MMC: CMD%d waiting for completion...\n", cmd->cmdidx);
-#endif
-		int to = 10000;
-		int tick = 0;
-		do {
-			stat = jz_mmc_readl(priv, MSC_STAT);
-#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-			if ((tick++ % 100) == 0) {
-				printf("JZ_MMC: CMD%d wait loop: STAT=0x%08x IFLG=0x%08x\n",
-				       cmd->cmdidx, stat, jz_mmc_readl(priv, MSC_IFLG));
-			}
-#endif
-			if (stat & (MSC_STAT_END_CMD_RES | MSC_STAT_TIME_OUT_RES))
-				break;
-			WATCHDOG_RESET();
-			udelay(10);
-		} while (--to);
-#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-		printf("JZ_MMC: CMD%d completion detected (stat=0x%08x, remaining_to=%d)\n", cmd->cmdidx, stat, to);
-		printf("  Post-CMD%d: STAT=0x%08x IFLG=0x%08x\n",
-		       cmd->cmdidx, jz_mmc_readl(priv, MSC_STAT), jz_mmc_readl(priv, MSC_IFLG));
-#endif
-	} else {
-		int to = 10000;
-		do {
-			stat = jz_mmc_readl(priv, MSC_STAT);
-			if (stat & MSC_STAT_END_CMD_RES)
-				break;
-			/* TIME_OUT_RES can be sticky on T23; don't break solely on it */
-			WATCHDOG_RESET();
-			udelay(100);
-		} while (--to);
-	}
+	/* wait for completion */
+	while (!(stat = (jz_mmc_readl(priv, MSC_IFLG) & (MSC_IREG_END_CMD_RES | MSC_IREG_TIME_OUT_RES))))
+		udelay(10000);
 	/* Do not clear IFLG here; read response first like Linux driver */
 
 	/* Determine if we may accept a response despite timeout (SDIO quirk) */
-	int timed_out = (stat & MSC_STAT_TIME_OUT_RES) != 0;
-	/* If END_CMD_RES is set, treat as non-timeout even if TIME_OUT_RES is also set (sticky bit) */
-	if (stat & MSC_STAT_END_CMD_RES)
-		timed_out = 0;
+	int timed_out = (stat & MSC_IREG_TIME_OUT_RES) != 0;
 	int allow_timeout_resp = 0;
 	if (timed_out && (cmd->resp_type & MMC_RSP_PRESENT)) {
 		/* Only CMD5 (R4) can have valid response despite TIMEOUT on this controller */

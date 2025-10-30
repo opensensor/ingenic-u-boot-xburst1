@@ -79,28 +79,31 @@ int misc_init_r(void)
 	/* used for usb_dete */
 	gpio_enable_pull_up(GPIO_PB(24));//UART1 rx
 
-#ifdef CONFIG_JZ_MMC_MSC0
+#ifdef CONFIG_JZ_MMC_MSC1
 	/* Power cycle ATBM6441 WiFi chip (like Linux SDK does) */
 	printf("\nATBM: Power cycling WiFi chip...\n");
 
 	/* Step 1: Power OFF (reset the chip) */
 	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) LOW (power off)...\n");
 	gpio_port_direction_output(GPIO_PORT_C, 9, 0);
-	udelay(200000);  /* Wait 200ms (power-off hold) */
+	udelay(500000);  /* Wait 500ms (power-off hold, increased) */
 
 	/* Step 2: Power ON */
 	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) HIGH (power on)...\n");
 	gpio_port_direction_output(GPIO_PORT_C, 9, 1);
 
-	/* Step 3: Set WL_WAKE_HOST if needed */
-	printf("ATBM: Setting WL_WAKE_HOST (GPIO_PC8) HIGH...\n");
+	/* Step 3: Toggle WL_WAKE_HOST to wake the chip's MCU */
+	printf("ATBM: Toggling WL_WAKE_HOST (GPIO_PC8) LOW->HIGH before SDIO init...\n");
+	gpio_port_direction_output(GPIO_PORT_C, 8, 0);
+	udelay(10000);  /* 10ms low pulse */
 	gpio_port_direction_output(GPIO_PORT_C, 8, 1);
+	udelay(50000);  /* 50ms after high */
 
 	/* Step 4: Wait for chip to stabilize (feed WDT while waiting) */
-	printf("ATBM: Waiting 1500ms for chip to stabilize...\n");
-	for (i = 0; i < 15; ++i) {
+	printf("ATBM: Waiting 2500ms for chip to stabilize...\n");
+	for (i = 0; i < 25; ++i) {
 		WATCHDOG_RESET();
-		udelay(100000); /* 100ms x 15 */
+		udelay(100000); /* 100ms x 25 */
 	}
 	printf("ATBM: WiFi chip power cycle complete!\n\n");
 

@@ -15,6 +15,7 @@
 #include <malloc.h>
 #include <linux/list.h>
 #include <div64.h>
+#include <watchdog.h>
 #include "mmc_private.h"
 
 /* Set block count limit because of 16 bit register limit on some hardware*/
@@ -1362,6 +1363,7 @@ int mmc_start_init(struct mmc *mmc)
 					}
 					if (sdio_err != 0)
 						break;
+					WATCHDOG_RESET();
 					udelay(10000);
 				}
 	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
@@ -1378,13 +1380,26 @@ int mmc_start_init(struct mmc *mmc)
 		err = mmc_send_op_cond(mmc);
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 		printf("MMC:   CMD1 (MMC_SEND_OP_COND) returned: %d\n", err);
+			printf("MMC:   Debug: IN_PROGRESS=%d, dev=%d\n", IN_PROGRESS, mmc->block_dev.dev);
 #endif
 
-		/* If MMC also failed, try SDIO (CMD5). For MSC1 (dev=1), also try SDIO even if CMD1 returned IN_PROGRESS. */
-		if (err && (err != IN_PROGRESS || mmc->block_dev.dev == 1)) {
+		/* If MMC also failed, try SDIO (CMD5).
+		 * For dev=1 (MSC1) or dev=0 with CONFIG_T23_PREFER_SDIO_ON_MSC0, also try SDIO even if CMD1 returned IN_PROGRESS.
+		 */
+		if (err && (
+				/* Normal case: MMC failed with a real error */
+				err != IN_PROGRESS ||
+				/* Force SDIO even on IN_PROGRESS for MSC1 (dev=1) */
+				mmc->block_dev.dev == 1
+#ifdef CONFIG_T23_PREFER_SDIO_ON_MSC0
+				/* Force SDIO even on IN_PROGRESS for MSC0 (dev=0) on this board */
+				|| mmc->block_dev.dev == 0
+#endif
+				)) {
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-			if (err == IN_PROGRESS && mmc->block_dev.dev == 1)
-				printf("MMC:   CMD1 returned IN_PROGRESS, but dev=1; forcing SDIO probe\n");
+			if (err == IN_PROGRESS) {
+				printf("MMC:   CMD1 returned IN_PROGRESS on dev=%d; forcing SDIO probe due to board config\n", mmc->block_dev.dev);
+			}
 			printf("MMC:   Trying SDIO initialization (CMD5)...\n");
 #endif
 			/* Try SDIO CMD5 - IO_SEND_OP_COND */
@@ -1397,9 +1412,22 @@ int mmc_start_init(struct mmc *mmc)
 			cmd.resp_type = MMC_RSP_R4;
 			cmd.cmdarg = 0;
 
+				/* Override arg with host voltages to request power-up immediately */
+				{
+					unsigned int first_arg = mmc->voltages & 0x00FFFFFF;
+					if (!first_arg)
+						first_arg = 0x00ff8000; /* default 3.2-3.4V range */
+					cmd.cmdarg = first_arg;
+				}
+
+
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
-			printf("MMC:   Sending CMD5 with arg=0 to query OCR...\n");
+			printf("MMC:   Sending CMD5 (voltage select first) arg=0x%06x...\n", cmd.cmdarg);
 #endif
+				/* small pre-CMD5 delay to let IO rail settle */
+				WATCHDOG_RESET();
+				udelay(50000);
+
 			sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 			printf("MMC:   CMD5 query returned: %d, response[0]=0x%08x\n", sdio_err, cmd.response[0]);
@@ -1518,7 +1546,8 @@ int mmc_start_init(struct mmc *mmc)
 					if (sdio_err != 0) {
 						break;  /* Stop if command fails */
 					}
-					udelay(10000);  /* 10ms between retries */
+					WATCHDOG_RESET();
+					udelay(25000);  /* 25ms between retries */
 				}
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 				printf("MMC:   SDIO timeout after %d retries\n", i);

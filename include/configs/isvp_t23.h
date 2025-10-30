@@ -118,6 +118,18 @@
 /* Stop SDIO init after CMD7 to avoid watchdog resets during bring-up */
 #define CONFIG_T23_SDIO_RETURN_AFTER_CMD7 1
 
+/* Enable ATBM6441 background keepalive in watchdog reset macro */
+#define CONFIG_ATBM_BACKGROUND_KEEPALIVE 1
+
+/* Override WATCHDOG_RESET to include ATBM keepalive */
+#ifdef CONFIG_JZ_MMC_MSC1
+#ifndef __ASSEMBLY__
+#include "../../board/ingenic/isvp_t23/atbm_keepalive.h"
+#undef WATCHDOG_RESET
+#define WATCHDOG_RESET() do { atbm_background_keepalive(); } while (0)
+#endif
+#endif
+
 
 
 #if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_JZ_MMC_MSC1)
