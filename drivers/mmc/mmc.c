@@ -1265,6 +1265,113 @@ int mmc_start_init(struct mmc *mmc)
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 	printf("MMC:   ACMD41 (SD_SEND_OP_COND) returned: %d\n", err);
 #endif
+#if defined(CONFIG_T23_PREFER_SDIO_ON_MSC0)
+		/* On T23 MSC0 we prefer SDIO; even if ACMD41 appears to succeed, probe SDIO. */
+		if (err == 0 && mmc->block_dev.dev == 0) {
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			printf("MMC:   Preferring SDIO on dev0; checking CMD5 despite ACMD41 success...\n");
+	#endif
+			struct mmc_cmd cmd;
+			int sdio_err;
+			int i;
+			cmd.cmdidx = 5;  /* IO_SEND_OP_COND */
+			cmd.resp_type = MMC_RSP_R4;
+			cmd.cmdarg = 0;
+			sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+			printf("MMC:   CMD5 query (post-ACMD41): %d, resp=0x%08x\n", sdio_err, cmd.response[0]);
+	#endif
+			if (sdio_err == 0) {
+				unsigned int ocr = cmd.response[0] & 0x00FFFFFF;
+				unsigned int matched_ocr = ocr & mmc->voltages;
+				if (!matched_ocr)
+					matched_ocr = ocr;
+				for (i = 0; i < 100; i++) {
+					cmd.cmdarg = matched_ocr;
+					sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+					if (sdio_err == 0 && (cmd.response[0] & 0x80000000)) {
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   SDIO device ready (post-ACMD41) after %d retries\n", i + 1);
+	#endif
+						mmc->is_sdio = 1;
+						mmc->op_cond_pending = 0;
+						mmc->version = SD_VERSION_2;
+						mmc->ocr = cmd.response[0];
+						mmc->high_capacity = 0;
+						udelay(10000);
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   Sending CMD3 to get RCA...\n");
+	#endif
+						cmd.cmdidx = 3;  /* SEND_RELATIVE_ADDR */
+						cmd.cmdarg = 0;
+						cmd.resp_type = MMC_RSP_R6;
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD3 returned: %d, response: 0x%08x\n", sdio_err, cmd.response[0]);
+	#endif
+						if (!sdio_err) {
+							unsigned int r6 = cmd.response[0];
+							unsigned int rca = (r6 >> 16) & 0xFFFF;
+							if (rca == 0)
+								rca = 0x0001;
+							mmc->rca = rca;
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   Got RCA: 0x%04x\n", mmc->rca);
+	#endif
+						} else {
+							mmc->rca = 0x0001;
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   WARNING - CMD3 failed; using default RCA=0x0001\n");
+	#endif
+						}
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   Sending CMD7 to select card (RCA=0x%04x)...\n", mmc->rca);
+	#endif
+						cmd.cmdidx = 7;  /* SELECT/DESELECT_CARD */
+						cmd.cmdarg = mmc->rca << 16;
+						cmd.resp_type = MMC_RSP_R1b;
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD7 returned: %d, response: 0x%08x\n", sdio_err, cmd.response[0]);
+	#endif
+						udelay(10000);
+#ifdef CONFIG_T23_SDIO_RETURN_AFTER_CMD7
+							/* On T23 SDIO bring-up: stop here to avoid hangs; Linux will init fully */
+							printf("MMC:   SDIO CMD7 done — skipping CMD52/CCCR and returning success\n");
+							mmc->is_sdio = 1;
+							return 0;
+#endif
+
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   SDIO: probing CCCR with CMD52 (F0, addr 0x00) ...\n");
+	#endif
+						cmd.cmdidx = 52;  /* CMD52 = IO_RW_DIRECT */
+						cmd.resp_type = MMC_RSP_R5;
+						cmd.cmdarg = (0 << 31) | (0 << 28) | (0 << 27) | (0x00 << 9);
+						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+						printf("MMC:   CMD52 read CCCR[0x00]: err=%d, resp=0x%08x\n", sdio_err, cmd.response[0]);
+	#endif
+						if (!sdio_err) {
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+							printf("MMC:   SDIO CCCR probe OK; SDIO initialization complete\n");
+	#endif
+							return 0;
+						}
+						return sdio_err;
+					}
+					if (sdio_err != 0)
+						break;
+					udelay(10000);
+				}
+	#if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
+				printf("MMC:   SDIO timeout after %d retries (post-ACMD41)\n", i);
+	#endif
+				/* Fall through to normal SD/MMC path if SDIO probe fails */
+			}
+		}
+#endif
+
 
 	/* If SD init did not succeed, check for an MMC card (and then SDIO) */
 	if (err) {

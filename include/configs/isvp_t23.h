@@ -97,8 +97,24 @@
 #define CONFIG_JZ_MMC			1
 #endif  /* JZ_MMC_MSC0 || JZ_MMC_MSC1 */
 
-/* Disable MSC1 registration to target MSC0 exclusively */
-#define CONFIG_JZ_MMC_DISABLE_MSC1 1
+/* Disable MSC0 registration so only SDIO host (MSC1) is probed */
+#define CONFIG_JZ_MMC_DISABLE_MSC0 1
+/* Map MSC1 registration to MSC0 base (0xb3450000) per HARDWARE_ANALYSIS.md */
+#define CONFIG_T23_REGISTER_MSC1_AT_MSC0_BASE 1
+
+/* Enable CPM clock-gate hard reset after SDIO CMD5 to clear sticky MSC0 response */
+#define CONFIG_JZ_MMC_CPM_RESET_AFTER_SDIO_CMD5 1
+
+
+/* Skip CMD3 for SDIO on T23; use default RCA (controller RES quirk) */
+#define CONFIG_JZ_MMC_SDIO_SKIP_CMD3 1
+
+/* Prefer SDIO probing on MSC0 even if ACMD41 appears OK (board is SDIO-only) */
+#define CONFIG_T23_PREFER_SDIO_ON_MSC0 1
+
+/* Force CLK divider register (MSC_CLKRT) to 0 for normal r/w (per vendor binary analysis) */
+#define CONFIG_JZ_MMC_FORCE_CLKRT_ZERO 1
+
 
 #if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_JZ_MMC_MSC1)
 /* Both MSC0 (SD card) and MSC1 (SDIO WiFi) enabled */

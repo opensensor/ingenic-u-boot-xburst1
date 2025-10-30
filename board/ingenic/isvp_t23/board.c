@@ -32,7 +32,7 @@
 #include <asm/arch/clk.h>
 #include <power/d2041_core.h>
 
-#ifdef CONFIG_JZ_MMC_MSC0
+#if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_ATBM_KEEPALIVE)
 /* ATBM6441 WiFi keepalive support */
 extern int atbm_init_keepalive(void);
 #endif
@@ -108,11 +108,9 @@ int misc_init_r(void)
 			if (ret == 0 && mmc->is_sdio) {
 				printf("\n========================================\n");
 				printf("ATBM: SDIO device enumerated successfully!\n");
+#if defined(CONFIG_ATBM_KEEPALIVE)
 				printf("ATBM: Starting firmware load and keepalive...\n");
 				printf("========================================\n\n");
-
-				/* Call the keepalive initialization */
-				extern int atbm_init_keepalive(void);
 				ret = atbm_init_keepalive();
 				if (ret == 0) {
 					printf("\n========================================\n");
@@ -124,6 +122,10 @@ int misc_init_r(void)
 					printf("ATBM: Keepalive failed with error %d\n", ret);
 					printf("========================================\n\n");
 				}
+#else
+				printf("ATBM: Build missing CONFIG_ATBM_KEEPALIVE; skipping keepalive for now.\n");
+				printf("========================================\n\n");
+#endif
 			}
 		} else {
 			printf("ATBM: ERROR - Could not find mmc device 0 (MSC0)!\n");
@@ -142,9 +144,13 @@ int board_late_init(void)
 	printf("========================================\n\n");
 
 #ifdef CONFIG_JZ_MMC_MSC0
+#ifdef CONFIG_ATBM_KEEPALIVE
 	/* Initialize ATBM6441 WiFi keepalive to prevent watchdog reboot */
 	/* This runs late in boot sequence, after MMC subsystem is fully initialized */
 	atbm_init_keepalive();
+#else
+	printf("ATBM: keepalive disabled (CONFIG_ATBM_KEEPALIVE not set)\n");
+#endif
 #else
 	printf("CONFIG_JZ_MMC_MSC0 not defined!\n");
 #endif
