@@ -1476,6 +1476,7 @@ int mmc_start_init(struct mmc *mmc)
 #endif
 						cmd.cmdidx = 7;  /* SELECT/DESELECT_CARD */
 						cmd.cmdarg = mmc->rca << 16;
+
 						cmd.resp_type = MMC_RSP_R1b;
 						sdio_err = mmc_send_cmd(mmc, &cmd, NULL);
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
@@ -1489,6 +1490,13 @@ int mmc_start_init(struct mmc *mmc)
 						printf("MMC:   SDIO: probing CCCR with CMD52 (F0, addr 0x00) ...\n");
 #endif
 						cmd.cmdidx = 52;  /* CMD52 = IO_RW_DIRECT */
+#ifdef CONFIG_T23_SDIO_RETURN_AFTER_CMD7
+							/* On T23 SDIO bring-up: stop here to avoid hangs; Linux will init fully */
+							printf("MMC:   SDIO CMD7 done — skipping CMD52/CCCR and returning success\n");
+							mmc->is_sdio = 1;
+							return 0;
+#endif
+
 						cmd.resp_type = MMC_RSP_R5;
 						/* Read Function 0, Address 0x00 (CCCR version/capabilities) */
 						cmd.cmdarg = (0 << 31) | (0 << 28) | (0 << 27) | (0x00 << 9);

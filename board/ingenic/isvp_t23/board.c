@@ -32,9 +32,11 @@
 #include <asm/arch/clk.h>
 #include <power/d2041_core.h>
 
-#if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_ATBM_KEEPALIVE)
-/* ATBM6441 WiFi keepalive support */
-extern int atbm_init_keepalive(void);
+#include <watchdog.h>
+
+#if defined(CONFIG_JZ_MMC_MSC1)
+/* ATBM6441 WiFi periodic keepalive support */
+extern void atbm_init_keepalive(void);
 #endif
 
 extern int jz_net_initialize(bd_t *bis);
@@ -66,6 +68,8 @@ void board_usb_init(void)
 
 int misc_init_r(void)
 {
+	int i, a, attempts, ret;
+
 #if 0 /* TO DO */
 	uint8_t mac[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
 
@@ -82,7 +86,7 @@ int misc_init_r(void)
 	/* Step 1: Power OFF (reset the chip) */
 	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) LOW (power off)...\n");
 	gpio_port_direction_output(GPIO_PORT_C, 9, 0);
-	udelay(100000);  /* Wait 100ms */
+	udelay(200000);  /* Wait 200ms (power-off hold) */
 
 	/* Step 2: Power ON */
 	printf("ATBM: Setting WL_REG_EN (GPIO_PC9) HIGH (power on)...\n");
@@ -92,9 +96,12 @@ int misc_init_r(void)
 	printf("ATBM: Setting WL_WAKE_HOST (GPIO_PC8) HIGH...\n");
 	gpio_port_direction_output(GPIO_PORT_C, 8, 1);
 
-	/* Step 4: Wait for chip to stabilize */
-	printf("ATBM: Waiting 500ms for chip to stabilize...\n");
-	udelay(500000);  /* Wait 500ms */
+	/* Step 4: Wait for chip to stabilize (feed WDT while waiting) */
+	printf("ATBM: Waiting 1500ms for chip to stabilize...\n");
+	for (i = 0; i < 15; ++i) {
+		WATCHDOG_RESET();
+		udelay(100000); /* 100ms x 15 */
+	}
 	printf("ATBM: WiFi chip power cycle complete!\n\n");
 
 	/* Step 5: Initialize MSC0 (SDIO) controller - target WiFi on MSC0 */
@@ -102,30 +109,30 @@ int misc_init_r(void)
 		struct mmc *mmc = find_mmc_device(0);
 		if (mmc) {
 			printf("ATBM: Initializing MSC0 (mmc device 0) for SDIO...\n");
-			int ret = mmc_init(mmc);
-			printf("ATBM: MSC0 init returned %d\n", ret);
+			ret = -1;
+			attempts = 1;  /* Only try once - don't block boot */
+			for (a = 1; a <= attempts; ++a) {
+				WATCHDOG_RESET();
+				ret = mmc_init(mmc);
+				printf("ATBM: MSC0 init attempt %d/%d returned %d\n", a, attempts, ret);
+				if (ret == 0)
+					break;
+			}
+			printf("ATBM: MSC0 final init status %d\n", ret);
 
 			if (ret == 0 && mmc->is_sdio) {
 				printf("\n========================================\n");
 				printf("ATBM: SDIO device enumerated successfully!\n");
-#if defined(CONFIG_ATBM_KEEPALIVE)
-				printf("ATBM: Starting firmware load and keepalive...\n");
+				printf("ATBM: Starting periodic keepalive...\n");
 				printf("========================================\n\n");
-				ret = atbm_init_keepalive();
-				if (ret == 0) {
-					printf("\n========================================\n");
-					printf("ATBM: Keepalive started successfully!\n");
-					printf("ATBM: System should stay alive indefinitely\n");
-					printf("========================================\n\n");
-				} else {
-					printf("\n========================================\n");
-					printf("ATBM: Keepalive failed with error %d\n", ret);
-					printf("========================================\n\n");
-				}
-#else
-				printf("ATBM: Build missing CONFIG_ATBM_KEEPALIVE; skipping keepalive for now.\n");
+
+				/* Start periodic keepalive to satisfy MCU watchdog */
+				atbm_init_keepalive();
+			} else {
+				printf("\n========================================\n");
+				printf("ATBM: SDIO initialization failed (ret=%d)\n", ret);
+				printf("ATBM: Continuing to U-Boot prompt anyway...\n");
 				printf("========================================\n\n");
-#endif
 			}
 		} else {
 			printf("ATBM: ERROR - Could not find mmc device 0 (MSC0)!\n");
@@ -143,17 +150,9 @@ int board_late_init(void)
 	printf("BOARD_LATE_INIT: Starting...\n");
 	printf("========================================\n\n");
 
-#ifdef CONFIG_JZ_MMC_MSC0
-#ifdef CONFIG_ATBM_KEEPALIVE
-	/* Initialize ATBM6441 WiFi keepalive to prevent watchdog reboot */
-	/* This runs late in boot sequence, after MMC subsystem is fully initialized */
-	atbm_init_keepalive();
-#else
-	printf("ATBM: keepalive disabled (CONFIG_ATBM_KEEPALIVE not set)\n");
-#endif
-#else
-	printf("CONFIG_JZ_MMC_MSC0 not defined!\n");
-#endif
+	/* Keepalive is already started in misc_init_r after SDIO enumeration */
+	printf("ATBM: Periodic keepalive already running from misc_init_r\n");
+
 	return 0;
 }
 #endif

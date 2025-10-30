@@ -115,6 +115,10 @@
 /* Force CLK divider register (MSC_CLKRT) to 0 for normal r/w (per vendor binary analysis) */
 #define CONFIG_JZ_MMC_FORCE_CLKRT_ZERO 1
 
+/* Stop SDIO init after CMD7 to avoid watchdog resets during bring-up */
+#define CONFIG_T23_SDIO_RETURN_AFTER_CMD7 1
+
+
 
 #if defined(CONFIG_JZ_MMC_MSC0) && defined(CONFIG_JZ_MMC_MSC1)
 /* Both MSC0 (SD card) and MSC1 (SDIO WiFi) enabled */

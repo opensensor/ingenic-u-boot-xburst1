@@ -16,6 +16,8 @@
 #include <asm/arch/cpm.h>
 #include <asm/arch/base.h>
 
+#include <watchdog.h>
+
 
 struct jz_mmc_priv {
 	uintptr_t base;
@@ -463,6 +465,7 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 #endif
 			if (stat & (MSC_STAT_END_CMD_RES | MSC_STAT_TIME_OUT_RES))
 				break;
+			WATCHDOG_RESET();
 			udelay(10);
 		} while (--to);
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
@@ -477,6 +480,7 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			if (stat & MSC_STAT_END_CMD_RES)
 				break;
 			/* TIME_OUT_RES can be sticky on T23; don't break solely on it */
+			WATCHDOG_RESET();
 			udelay(100);
 		} while (--to);
 	}
@@ -565,8 +569,10 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 			printf("JZ_MMC: R1b busy wait: SDIO detected; using bounded poll for PRG_DONE\n");
 #endif
 			to_prg = 2000; /* ~20ms at 10us step */
-			while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE) && --to_prg)
+			while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE) && --to_prg) {
+				WATCHDOG_RESET();
 				udelay(10);
+			}
 			if (!to_prg) {
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 				printf("JZ_MMC: R1b PRG_DONE not seen; proceeding to avoid hang on SDIO\n");
@@ -575,8 +581,10 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		} else {
 			/* Non-SDIO: wait with a generous but bounded loop to avoid hard lock */
 			to_prg = 1000000; /* ~1s max at tight loop */
-			while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE) && --to_prg)
-				;
+			while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE) && --to_prg) {
+				WATCHDOG_RESET();
+				udelay(10);
+			}
 			if (!to_prg) {
 #if !defined(CONFIG_SPL_BUILD) || defined(CONFIG_SPL_LIBCOMMON_SUPPORT)
 				printf("JZ_MMC: WARNING: R1b PRG_DONE timeout\n");
@@ -594,11 +602,15 @@ static int jz_mmc_send_cmd(struct mmc *mmc, struct mmc_cmd *cmd,
 		const void *buf = data->src;
 		while (sz--) {
 			uint32_t val = get_unaligned_le32(buf);
-			while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_TXFIFO_WR_REQ));
+			while (!(jz_mmc_readl(priv, MSC_IFLG) & MSC_IREG_TXFIFO_WR_REQ)) {
+				WATCHDOG_RESET();
+			}
 			jz_mmc_writel(val, priv, MSC_TXFIFO);
 			buf += 4;
 		}
-		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE));
+		while (!(jz_mmc_readl(priv, MSC_STAT) & MSC_STAT_PRG_DONE)) {
+			WATCHDOG_RESET();
+		}
 		jz_mmc_writel(MSC_IREG_PRG_DONE, priv, MSC_IFLG);
 	} else if (data && (data->flags & MMC_DATA_READ)) {
 		/* read the data */
